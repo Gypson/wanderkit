@@ -99,6 +99,7 @@ With those server env vars configured, Studio also loads saved drafts from Supab
 
 - `pnpm dev:studio`: starts the Next.js Creator Studio.
 - `pnpm dev:mobile`: starts Expo.
+- `pnpm dev:mobile:web`: starts Expo Web on port `8085` for browser smoke testing.
 - `pnpm supabase:start`: starts the local Supabase Docker stack.
 - `pnpm supabase:reset`: applies migrations and seed data to the local database.
 - `pnpm supabase:smoke`: verifies the seeded manifest lookup and immutability rules.

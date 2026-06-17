@@ -6,6 +6,7 @@
   "scripts": {
     "build": "pnpm -r --if-present build",
     "dev:mobile": "dotenv -c -- pnpm --filter @wanderkit/mobile dev",
+    "dev:mobile:web": "dotenv -c -- pnpm --filter @wanderkit/mobile web --port 8085",
     "dev:studio": "dotenv -c -- pnpm --filter @wanderkit/studio dev",
     "supabase:reset": "supabase db reset",
     "supabase:smoke": "node scripts/supabase-smoke.mjs",
