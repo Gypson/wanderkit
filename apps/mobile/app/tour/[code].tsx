@@ -155,6 +155,15 @@ function PublishedTourView({
   const [downloadingStopId, setDownloadingStopId] = useState<string | null>(
     null
   );
+  const [tourAudioDownload, setTourAudioDownload] = useState<{
+    message: string | null;
+    processedCount: number;
+    status: "idle" | "running";
+  }>({
+    message: null,
+    processedCount: 0,
+    status: "idle"
+  });
   const [isResettingProgress, setIsResettingProgress] = useState(false);
   const selectedStop = useMemo(
     () =>
@@ -171,6 +180,14 @@ function PublishedTourView({
   ).length;
   const isTourComplete =
     manifest.stops.length > 0 && playedCount === manifest.stops.length;
+  const audioSavedCount = manifest.stops.filter(
+    (stop) => audioStatuses[stop.id] === "downloaded"
+  ).length;
+  const isAudioDownloadUnavailable =
+    manifest.stops.length > 0 &&
+    manifest.stops.every((stop) => audioStatuses[stop.id] === "unavailable");
+  const isAllAudioSaved =
+    manifest.stops.length > 0 && audioSavedCount === manifest.stops.length;
 
   useEffect(() => {
     setAudioDownloadMessage(null);
@@ -197,6 +214,15 @@ function PublishedTourView({
           if (isMounted) {
             setProgress(nextProgress);
             setAudioStatuses(nextAudioStatuses);
+            setTourAudioDownload((currentDownload) =>
+              currentDownload.status === "running"
+                ? currentDownload
+                : {
+                    message: null,
+                    processedCount: 0,
+                    status: "idle"
+                  }
+            );
           }
         })
         .catch(() => {
@@ -258,6 +284,77 @@ function PublishedTourView({
     }
   };
 
+  const downloadAllAudio = async () => {
+    setAudioDownloadMessage(null);
+    setTourAudioDownload({
+      message: null,
+      processedCount: 0,
+      status: "running"
+    });
+
+    let savedCount = 0;
+    let unavailableCount = 0;
+    let failedCount = 0;
+
+    try {
+      for (const [index, stop] of manifest.stops.entries()) {
+        let nextStatus: AudioCacheStatus | null = null;
+
+        try {
+          const result = await downloadAudioForStop({
+            audioUrl: stop.audioUrl,
+            stopId: stop.id,
+            tourCode: manifest.tourCode
+          });
+
+          nextStatus = result.status;
+
+          if (result.status === "downloaded") {
+            savedCount += 1;
+          } else if (result.status === "unavailable") {
+            unavailableCount += 1;
+          } else {
+            failedCount += 1;
+          }
+        } catch {
+          failedCount += 1;
+        }
+
+        if (nextStatus) {
+          setAudioStatuses((currentStatuses) => ({
+            ...currentStatuses,
+            [stop.id]: nextStatus
+          }));
+        }
+
+        setTourAudioDownload({
+          message: `Checked ${index + 1} of ${manifest.stops.length} stops.`,
+          processedCount: index + 1,
+          status: "running"
+        });
+      }
+
+      setTourAudioDownload({
+        message: formatDownloadAllMessage({
+          failedCount,
+          savedCount,
+          unavailableCount
+        }),
+        processedCount: manifest.stops.length,
+        status: "idle"
+      });
+    } catch (error) {
+      setTourAudioDownload({
+        message:
+          error instanceof Error
+            ? error.message
+            : "Audio downloads could not be completed.",
+        processedCount: savedCount + failedCount + unavailableCount,
+        status: "idle"
+      });
+    }
+  };
+
   return (
     <>
       <View style={styles.header}>
@@ -285,6 +382,28 @@ function PublishedTourView({
           });
         }}
         playedCount={playedCount}
+        stopCount={manifest.stops.length}
+      />
+
+      <TourAudioDownloadPanel
+        isAllSaved={isAllAudioSaved}
+        isRunning={tourAudioDownload.status === "running"}
+        isUnavailable={isAudioDownloadUnavailable}
+        message={tourAudioDownload.message}
+        onDownloadAll={() => {
+          downloadAllAudio().catch((error) => {
+            setTourAudioDownload({
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Audio downloads could not be completed.",
+              processedCount: 0,
+              status: "idle"
+            });
+          });
+        }}
+        processedCount={tourAudioDownload.processedCount}
+        savedCount={audioSavedCount}
         stopCount={manifest.stops.length}
       />
 
@@ -367,6 +486,56 @@ function PublishedTourView({
         })}
       </View>
     </>
+  );
+}
+
+function TourAudioDownloadPanel({
+  isAllSaved,
+  isRunning,
+  isUnavailable,
+  message,
+  onDownloadAll,
+  processedCount,
+  savedCount,
+  stopCount
+}: {
+  isAllSaved: boolean;
+  isRunning: boolean;
+  isUnavailable: boolean;
+  message: string | null;
+  onDownloadAll: () => void;
+  processedCount: number;
+  savedCount: number;
+  stopCount: number;
+}) {
+  const action = getDownloadAllAction({
+    isAllSaved,
+    isRunning,
+    isUnavailable,
+    stopCount
+  });
+
+  return (
+    <View style={styles.downloadPanel}>
+      <View style={styles.downloadCopy}>
+        <Text style={styles.downloadEyebrow}>Audio downloads</Text>
+        <Text style={styles.downloadTitle}>
+          {savedCount} of {stopCount} stops saved
+        </Text>
+        <Text style={styles.downloadBody}>
+          {isRunning
+            ? `Downloading ${processedCount} of ${stopCount} stops.`
+            : "Save stop audio on this device for offline replay."}
+        </Text>
+      </View>
+      <ActionButton
+        disabled={action.disabled}
+        iconName={action.iconName}
+        label={action.label}
+        onPress={onDownloadAll}
+      />
+      {message ? <Text style={styles.downloadMessage}>{message}</Text> : null}
+    </View>
   );
 }
 
@@ -519,6 +688,52 @@ function formatAudioStatusLabel(status: AudioCacheStatus): string {
   return "Streaming only";
 }
 
+function getDownloadAllAction({
+  isAllSaved,
+  isRunning,
+  isUnavailable,
+  stopCount
+}: {
+  isAllSaved: boolean;
+  isRunning: boolean;
+  isUnavailable: boolean;
+  stopCount: number;
+}): {
+  disabled: boolean;
+  iconName: "checkmark" | "cloud-download" | "cloud-offline" | "refresh";
+  label: string;
+} {
+  if (isRunning) {
+    return {
+      disabled: true,
+      iconName: "refresh",
+      label: "Downloading all..."
+    };
+  }
+
+  if (stopCount === 0 || isUnavailable) {
+    return {
+      disabled: true,
+      iconName: "cloud-offline",
+      label: "Download all unavailable"
+    };
+  }
+
+  if (isAllSaved) {
+    return {
+      disabled: true,
+      iconName: "checkmark",
+      label: "All audio saved"
+    };
+  }
+
+  return {
+    disabled: false,
+    iconName: "cloud-download",
+    label: "Download all audio"
+  };
+}
+
 function getAudioDownloadAction({
   audioStatus,
   isDownloading
@@ -559,6 +774,30 @@ function getAudioDownloadAction({
     iconName: "cloud-download",
     label: "Download audio"
   };
+}
+
+function formatDownloadAllMessage({
+  failedCount,
+  savedCount,
+  unavailableCount
+}: {
+  failedCount: number;
+  savedCount: number;
+  unavailableCount: number;
+}): string {
+  if (savedCount > 0 && failedCount === 0 && unavailableCount === 0) {
+    return `Saved audio for ${savedCount} stop${savedCount === 1 ? "" : "s"}.`;
+  }
+
+  if (unavailableCount > 0 && savedCount === 0) {
+    return "Audio downloads are not available on this device.";
+  }
+
+  if (failedCount > 0) {
+    return `Saved ${savedCount} stop${savedCount === 1 ? "" : "s"}; ${failedCount} failed.`;
+  }
+
+  return `Saved ${savedCount} stop${savedCount === 1 ? "" : "s"}; ${unavailableCount} unavailable.`;
 }
 
 function formatDuration(seconds: number | undefined): string {
@@ -661,6 +900,40 @@ const styles = StyleSheet.create({
     color: "#2d6a4f",
     fontSize: 12,
     fontWeight: "800"
+  },
+  downloadPanel: {
+    backgroundColor: "#ffffff",
+    borderColor: "#d5ded8",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 12,
+    marginTop: 14,
+    padding: 16
+  },
+  downloadCopy: {
+    gap: 4
+  },
+  downloadEyebrow: {
+    color: "#2d6a4f",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+    textTransform: "uppercase"
+  },
+  downloadTitle: {
+    color: "#16202a",
+    fontSize: 18,
+    fontWeight: "800"
+  },
+  downloadBody: {
+    color: "#53615a",
+    fontSize: 13,
+    lineHeight: 19
+  },
+  downloadMessage: {
+    color: "#53615a",
+    fontSize: 13,
+    lineHeight: 19
   },
   selectedPanel: {
     backgroundColor: "#16202a",

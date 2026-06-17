@@ -50,7 +50,13 @@ async function main() {
     console.log("Entry screen renders with empty offline cache.");
 
     await page.navigate(`${MOBILE_WEB_URL}/tour/OLDTOWN`);
-    await waitForText(page, ["Old Town Loop", "Route preview"]);
+    await waitForText(page, [
+      "Old Town Loop",
+      "Route preview",
+      "AUDIO DOWNLOADS",
+      "0 of 3 stops saved",
+      "Download all unavailable"
+    ]);
     await assertText(page, [
       "0 of 3 stops played",
       "Streaming only",
