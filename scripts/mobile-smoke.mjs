@@ -68,6 +68,19 @@ async function main() {
     await waitForText(page, ["Streaming audio"]);
     console.log("Stop detail renders audio controls and stop metadata.");
 
+    await page.navigate(`${MOBILE_WEB_URL}/`);
+    await waitForText(page, ["CONTINUE", "Continue stop"]);
+    await assertText(page, ["Stop 1: Market Square", "Old Town Loop"]);
+    await clickByText(page, "Continue stop");
+    await waitForText(page, ["Market Square", "Audio"]);
+    console.log("Entry screen resumes the last opened stop.");
+
+    await page.navigate(`${MOBILE_WEB_URL}/tour/OLDTOWN/stop/missing-stop`);
+    await waitForText(page, ["Stop not found", "Open route"]);
+    await clickByText(page, "Open route");
+    await waitForText(page, ["Old Town Loop", "Route preview"]);
+    console.log("Bad stop deep links offer a route fallback.");
+
     await page.navigate(`${MOBILE_WEB_URL}/tour/BADJSON`);
     await waitForText(page, ["Manifest is invalid"]);
     await assertText(page, [
@@ -85,9 +98,12 @@ async function main() {
     await page.navigate(`${MOBILE_WEB_URL}/`);
     await waitForText(page, ["Old Town Loop", "TOURS"]);
     await assertText(page, [
+      "CONTINUE",
+      "Continue route",
       "Victoria - 3 stops",
       "Published",
       "Hash",
+      "Open",
       "OLDTOWN"
     ]);
     await clickByText(page, "Clear offline data");

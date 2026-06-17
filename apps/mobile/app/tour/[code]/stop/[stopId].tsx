@@ -16,12 +16,14 @@ import {
   Text,
   View
 } from "react-native";
+import { ActionButton } from "../../../../components/ActionButton";
 import { CachedManifestNotice } from "../../../../components/CachedManifestNotice";
 import { RetryButton } from "../../../../components/RetryButton";
 import { StatePanel } from "../../../../components/StatePanel";
 import { getCachedAudioUri, type CachedAudioResult } from "../../../../lib/audioCache";
 import type { TourLookupState } from "../../../../lib/tourLookup";
 import { useTourLookup } from "../../../../lib/useTourLookup";
+import { saveVisitorResumeStop } from "../../../../lib/visitorResume";
 
 export default function StopDetailScreen() {
   const router = useRouter();
@@ -31,16 +33,20 @@ export default function StopDetailScreen() {
   }>();
   const { lookupState, normalizedCode, retryLookup } = useTourLookup(code);
   const selectedStopId = normalizeParam(stopId);
+  const openRoute = () => {
+    router.replace(`/tour/${encodeURIComponent(normalizedCode)}`);
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Pressable onPress={openRoute} style={styles.backButton}>
           <Ionicons color="#2d6a4f" name="chevron-back" size={18} />
           <Text style={styles.backText}>Route</Text>
         </Pressable>
 
         <StopDetailContent
+          onOpenRoute={openRoute}
           onRetry={() => void retryLookup()}
           selectedStopId={selectedStopId}
           state={lookupState}
@@ -52,11 +58,13 @@ export default function StopDetailScreen() {
 }
 
 function StopDetailContent({
+  onOpenRoute,
   onRetry,
   selectedStopId,
   state,
   tourCode
 }: {
+  onOpenRoute: () => void;
   onRetry: () => void;
   selectedStopId: string;
   state: TourLookupState;
@@ -127,7 +135,13 @@ function StopDetailContent({
   if (!stop) {
     return (
       <StatePanel
-        action={<RetryButton label="Reload tour" onPress={onRetry} />}
+        action={
+          <ActionButton
+            iconName="map"
+            label="Open route"
+            onPress={onOpenRoute}
+          />
+        }
         body="This stop is not present in the published manifest."
         code={tourCode}
         title="Stop not found"
@@ -161,6 +175,12 @@ function PlayableStop({
   manifest: PublishedTourManifest;
   stop: PublishedStop;
 }) {
+  useEffect(() => {
+    saveVisitorResumeStop({ manifest, stop }).catch(() => {
+      // Resume state should not block playing a valid stop.
+    });
+  }, [manifest, stop]);
+
   return (
     <>
       <View style={styles.header}>

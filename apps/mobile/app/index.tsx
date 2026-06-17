@@ -10,6 +10,7 @@ import {
   TextInput,
   View
 } from "react-native";
+import { ActionButton } from "../components/ActionButton";
 import {
   clearAudioCache,
   getAudioCacheSummary,
@@ -25,6 +26,11 @@ import {
   formatShortContentHash
 } from "../lib/format";
 import { sampleTourManifest } from "../lib/sampleTour";
+import {
+  clearVisitorResumeState,
+  getVisitorResumeState,
+  type VisitorResumeState
+} from "../lib/visitorResume";
 
 type CachePanelState =
   | { status: "loading" }
@@ -43,22 +49,45 @@ export default function CodeEntryScreen() {
     status: "loading"
   });
   const [isClearingCache, setIsClearingCache] = useState(false);
+  const [resumeState, setResumeState] = useState<VisitorResumeState | null>(
+    null
+  );
 
-  const openTour = () => {
-    const normalizedCode = tourCode.trim().toUpperCase();
-    router.push(`/tour/${normalizedCode || sampleTourManifest.tourCode}`);
-  };
+  const openTourByCode = useCallback(
+    (code: string) => {
+      const normalizedCode = code.trim().toUpperCase();
+      const safeCode = normalizedCode || sampleTourManifest.tourCode;
+      router.push(`/tour/${encodeURIComponent(safeCode)}`);
+    },
+    [router]
+  );
+
+  const openTour = () => openTourByCode(tourCode);
+
+  const openResumeStop = useCallback(() => {
+    if (!resumeState?.lastStop) {
+      return;
+    }
+
+    router.push(
+      `/tour/${encodeURIComponent(
+        resumeState.tourCode
+      )}/stop/${encodeURIComponent(resumeState.lastStop.id)}`
+    );
+  }, [resumeState, router]);
 
   const refreshCacheState = useCallback(
     async (message: string | null = null) => {
       setCacheState({ status: "loading" });
 
       try {
-        const [manifests, audio] = await Promise.all([
+        const [manifests, audio, resume] = await Promise.all([
           listCachedPublishedTourManifests(),
-          getAudioCacheSummary()
+          getAudioCacheSummary(),
+          getVisitorResumeState()
         ]);
 
+        setResumeState(resume);
         setCacheState({
           status: "ready",
           manifests,
@@ -66,6 +95,7 @@ export default function CodeEntryScreen() {
           message
         });
       } catch (error) {
+        setResumeState(null);
         setCacheState({
           status: "error",
           message:
@@ -90,7 +120,8 @@ export default function CodeEntryScreen() {
     try {
       const [manifestCount, audio] = await Promise.all([
         clearCachedPublishedTourManifests(),
-        clearAudioCache()
+        clearAudioCache(),
+        clearVisitorResumeState()
       ]);
 
       await refreshCacheState(
@@ -140,9 +171,18 @@ export default function CodeEntryScreen() {
           </Pressable>
         </View>
 
+        {resumeState ? (
+          <ResumePanel
+            onOpenRoute={() => openTourByCode(resumeState.tourCode)}
+            onOpenStop={openResumeStop}
+            resume={resumeState}
+          />
+        ) : null}
+
         <OfflineCachePanel
           isClearing={isClearingCache}
           onClear={() => void clearOfflineCache()}
+          onOpenTour={openTourByCode}
           onRefresh={() => void refreshCacheState()}
           state={cacheState}
         />
@@ -154,11 +194,13 @@ export default function CodeEntryScreen() {
 function OfflineCachePanel({
   isClearing,
   onClear,
+  onOpenTour,
   onRefresh,
   state
 }: {
   isClearing: boolean;
   onClear: () => void;
+  onOpenTour: (tourCode: string) => void;
   onRefresh: () => void;
   state: CachePanelState;
 }) {
@@ -211,7 +253,16 @@ function OfflineCachePanel({
           {state.manifests.length > 0 ? (
             <View style={styles.cachedTourList}>
               {state.manifests.slice(0, 3).map((manifest) => (
-                <View key={manifest.tourCode} style={styles.cachedTourRow}>
+                <Pressable
+                  accessibilityLabel={`Open ${manifest.title}`}
+                  accessibilityRole="button"
+                  key={manifest.tourCode}
+                  onPress={() => onOpenTour(manifest.tourCode)}
+                  style={({ pressed }) => [
+                    styles.cachedTourRow,
+                    pressed ? styles.cachedTourRowPressed : null
+                  ]}
+                >
                   <View style={styles.cachedTourText}>
                     <Text style={styles.cachedTourTitle}>{manifest.title}</Text>
                     <Text style={styles.cachedTourMeta}>
@@ -227,8 +278,13 @@ function OfflineCachePanel({
                       )}`}
                     </Text>
                   </View>
-                  <Text style={styles.cachedTourCode}>{manifest.tourCode}</Text>
-                </View>
+                  <View style={styles.cachedTourAction}>
+                    <Text style={styles.cachedTourCode}>
+                      {manifest.tourCode}
+                    </Text>
+                    <Text style={styles.cachedTourOpen}>Open</Text>
+                  </View>
+                </Pressable>
               ))}
             </View>
           ) : (
@@ -255,6 +311,51 @@ function OfflineCachePanel({
           </Pressable>
         </>
       ) : null}
+    </View>
+  );
+}
+
+function ResumePanel({
+  onOpenRoute,
+  onOpenStop,
+  resume
+}: {
+  onOpenRoute: () => void;
+  onOpenStop: () => void;
+  resume: VisitorResumeState;
+}) {
+  const hasStop = Boolean(resume.lastStop);
+  const resumeText = resume.lastStop
+    ? `Stop ${resume.lastStop.number}: ${resume.lastStop.title}`
+    : "Route map";
+
+  return (
+    <View style={styles.resumePanel}>
+      <View style={styles.resumeCopy}>
+        <Text style={styles.resumeEyebrow}>Continue</Text>
+        <Text style={styles.resumeTitle}>{resume.tourTitle}</Text>
+        <Text style={styles.resumeBody}>
+          {resumeText} - last opened {formatDisplayTimestamp(resume.updatedAt)}
+        </Text>
+        <Text style={styles.resumeMeta}>
+          {resume.city} - {resume.tourCode}
+        </Text>
+      </View>
+      <View style={styles.resumeActions}>
+        <ActionButton
+          iconName={hasStop ? "play" : "map"}
+          label={hasStop ? "Continue stop" : "Continue route"}
+          onPress={hasStop ? onOpenStop : onOpenRoute}
+          variant="dark"
+        />
+        {hasStop ? (
+          <ActionButton
+            iconName="map"
+            label="Open route"
+            onPress={onOpenRoute}
+          />
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -345,6 +446,46 @@ const styles = StyleSheet.create({
     color: "#ffffff",
     fontSize: 16,
     fontWeight: "700"
+  },
+  resumePanel: {
+    backgroundColor: "#ffffff",
+    borderColor: "#d5ded8",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 14,
+    marginTop: 24,
+    padding: 16
+  },
+  resumeCopy: {
+    gap: 5
+  },
+  resumeEyebrow: {
+    color: "#2d6a4f",
+    fontSize: 12,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+    textTransform: "uppercase"
+  },
+  resumeTitle: {
+    color: "#16202a",
+    fontSize: 20,
+    fontWeight: "800",
+    letterSpacing: 0
+  },
+  resumeBody: {
+    color: "#53615a",
+    fontSize: 14,
+    lineHeight: 20
+  },
+  resumeMeta: {
+    color: "#6d766f",
+    fontSize: 12,
+    fontWeight: "800"
+  },
+  resumeActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
   },
   cachePanel: {
     backgroundColor: "#ffffff",
@@ -443,6 +584,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 10
   },
+  cachedTourRowPressed: {
+    opacity: 0.78
+  },
   cachedTourText: {
     flex: 1,
     gap: 2
@@ -461,9 +605,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 16
   },
+  cachedTourAction: {
+    alignItems: "flex-end",
+    gap: 3
+  },
   cachedTourCode: {
     color: "#2d6a4f",
     fontSize: 12,
+    fontWeight: "800"
+  },
+  cachedTourOpen: {
+    color: "#53615a",
+    fontSize: 11,
     fontWeight: "800"
   },
   cacheMessage: {

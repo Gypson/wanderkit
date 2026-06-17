@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -16,6 +16,7 @@ import { StatePanel } from "../../components/StatePanel";
 import { TourMap } from "../../components/TourMap";
 import type { TourLookupState } from "../../lib/tourLookup";
 import { useTourLookup } from "../../lib/useTourLookup";
+import { saveVisitorResumeTour } from "../../lib/visitorResume";
 
 export default function TourScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
@@ -131,6 +132,13 @@ function PublishedTourView({
       manifest.stops[0],
     [manifest.stops, selectedStopId]
   );
+
+  useEffect(() => {
+    saveVisitorResumeTour(manifest).catch(() => {
+      // Resume state should not block rendering a valid tour.
+    });
+  }, [manifest]);
+
   const openStop = (stop: PublishedStop) => {
     router.push(
       `/tour/${encodeURIComponent(manifest.tourCode)}/stop/${encodeURIComponent(

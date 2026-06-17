@@ -14,7 +14,7 @@ Use this list to keep early work sequenced.
 
 ## Mobile
 
-- Add tour resume/deep-link polish for visitors returning to a saved code.
+- Add played-stop progress markers and local tour completion state.
 
 ## Completed Foundation Slices
 
@@ -40,6 +40,7 @@ Use this list to keep early work sequenced.
 - Added local Supabase CLI config, alternate Windows-safe ports, and smoke test.
 - Added automated mobile web smoke coverage for tour lookup, invalid codes, stop detail, and cache clearing.
 - Added mobile offline UX polish, cached manifest metadata, and retry controls.
+- Added mobile tour resume, cached-tour reopening, and stop deep-link fallback polish.
 
 ## Backend
 
