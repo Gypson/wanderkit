@@ -166,6 +166,7 @@ function StopDetailContent({
           : null
       }
       manifest={state.manifest}
+      onRefreshManifest={onRetry}
       stop={stop}
     />
   );
@@ -174,6 +175,7 @@ function StopDetailContent({
 function PlayableStop({
   cacheMetadata,
   manifest,
+  onRefreshManifest,
   stop
 }: {
   cacheMetadata: {
@@ -181,6 +183,7 @@ function PlayableStop({
     reason: "config-missing" | "network-error";
   } | null;
   manifest: PublishedTourManifest;
+  onRefreshManifest: () => void;
   stop: PublishedStop;
 }) {
   const [progress, setProgress] = useState<TourProgressState>(() =>
@@ -240,6 +243,7 @@ function PlayableStop({
         <CachedManifestNotice
           cachedAt={cacheMetadata.cachedAt}
           contentHash={manifest.contentHash}
+          onRefresh={onRefreshManifest}
           publishedAt={manifest.publishedAt}
           reason={cacheMetadata.reason}
           title="Saved stop details"

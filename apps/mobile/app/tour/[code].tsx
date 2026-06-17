@@ -130,19 +130,22 @@ function TourLookupContent({
           : null
       }
       manifest={state.manifest}
+      onRefreshManifest={onRetry}
     />
   );
 }
 
 function PublishedTourView({
   cacheMetadata,
-  manifest
+  manifest,
+  onRefreshManifest
 }: {
   cacheMetadata: {
     cachedAt: string | null;
     reason: "config-missing" | "network-error";
   } | null;
   manifest: PublishedTourManifest;
+  onRefreshManifest: () => void;
 }) {
   const router = useRouter();
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
@@ -434,6 +437,7 @@ function PublishedTourView({
         <CachedManifestNotice
           cachedAt={cacheMetadata.cachedAt}
           contentHash={manifest.contentHash}
+          onRefresh={onRefreshManifest}
           publishedAt={manifest.publishedAt}
           reason={cacheMetadata.reason}
         />

@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
+import { ActionButton } from "./ActionButton";
 import {
   formatDisplayTimestamp,
   formatShortContentHash
@@ -9,12 +10,16 @@ type CachedManifestReason = "config-missing" | "network-error";
 export function CachedManifestNotice({
   cachedAt,
   contentHash,
+  isRefreshing = false,
+  onRefresh,
   publishedAt,
   reason,
   title = "Saved tour copy"
 }: {
   cachedAt: string | null;
   contentHash: string;
+  isRefreshing?: boolean;
+  onRefresh?: () => void;
   publishedAt: string;
   reason: CachedManifestReason;
   title?: string;
@@ -35,6 +40,14 @@ export function CachedManifestNotice({
         />
         <CacheMeta label="Hash" value={formatShortContentHash(contentHash)} />
       </View>
+      {onRefresh ? (
+        <ActionButton
+          disabled={isRefreshing}
+          iconName="refresh"
+          label={isRefreshing ? "Checking..." : "Check for updates"}
+          onPress={onRefresh}
+        />
+      ) : null}
     </View>
   );
 }

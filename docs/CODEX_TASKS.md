@@ -14,7 +14,7 @@ Use this list to keep early work sequenced.
 
 ## Mobile
 
-- Add route manifest refresh control for cached tours.
+- Add cached manifest refresh status messaging after retry.
 
 ## Completed Foundation Slices
 
@@ -48,6 +48,7 @@ Use this list to keep early work sequenced.
 - Added route-level download-all audio queue.
 - Added downloaded-audio cleanup controls per tour.
 - Added audio cache size/count summary for the current tour.
+- Added route manifest refresh controls for cached tours.
 
 ## Backend
 

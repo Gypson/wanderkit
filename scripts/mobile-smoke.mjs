@@ -71,6 +71,34 @@ async function main() {
     ]);
     console.log("OLDTOWN route renders published manifest content.");
 
+    await page.navigate(`${MOBILE_WEB_URL}/`);
+    await waitForText(page, ["Enter tour code", "Open tour"]);
+    await page.evaluate(`
+      (() => {
+        window.__wanderkitOriginalFetch = window.fetch;
+        window.fetch = () => Promise.reject(new Error("Smoke forced offline lookup."));
+        return true;
+      })()
+    `);
+    await clickByText(page, "Open tour");
+    await waitForText(page, [
+      "SAVED TOUR COPY",
+      "The live lookup failed",
+      "Check for updates",
+      "OLDTOWN"
+    ]);
+    await clickByText(page, "Check for updates");
+    await waitForText(page, ["SAVED TOUR COPY", "Check for updates"]);
+    await page.evaluate(`
+      (() => {
+        if (window.__wanderkitOriginalFetch) {
+          window.fetch = window.__wanderkitOriginalFetch;
+        }
+        return true;
+      })()
+    `);
+    console.log("Cached route manifests can request a live refresh.");
+
     await page.navigate(
       `${MOBILE_WEB_URL}/tour/OLDTOWN/stop/00000000-0000-0000-0000-000000000401`
     );
