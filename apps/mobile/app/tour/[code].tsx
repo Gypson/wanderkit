@@ -10,6 +10,7 @@ import {
   Text,
   View
 } from "react-native";
+import { ActionButton } from "../../components/ActionButton";
 import { CachedManifestNotice } from "../../components/CachedManifestNotice";
 import { RetryButton } from "../../components/RetryButton";
 import type { PublishedStop, PublishedTourManifest } from "@wanderkit/shared";
@@ -17,6 +18,7 @@ import { StatePanel } from "../../components/StatePanel";
 import { TourMap } from "../../components/TourMap";
 import { formatDisplayTimestamp } from "../../lib/format";
 import {
+  clearTourProgressState,
   createEmptyTourProgress,
   getProgressSummary,
   getTourProgressState,
@@ -138,6 +140,7 @@ function PublishedTourView({
   const [progress, setProgress] = useState<TourProgressState>(() =>
     createEmptyTourProgress(manifest.tourCode)
   );
+  const [isResettingProgress, setIsResettingProgress] = useState(false);
   const selectedStop = useMemo(
     () =>
       manifest.stops.find((stop) => stop.id === selectedStopId) ??
@@ -190,6 +193,17 @@ function PublishedTourView({
     );
   };
 
+  const resetProgress = async () => {
+    setIsResettingProgress(true);
+
+    try {
+      await clearTourProgressState(manifest.tourCode);
+      setProgress(createEmptyTourProgress(manifest.tourCode));
+    } finally {
+      setIsResettingProgress(false);
+    }
+  };
+
   return (
     <>
       <View style={styles.header}>
@@ -210,6 +224,12 @@ function PublishedTourView({
       <TourProgressPanel
         completedAt={progress.completedAt}
         isComplete={isTourComplete}
+        isResetting={isResettingProgress}
+        onReset={() => {
+          resetProgress().catch(() => {
+            setIsResettingProgress(false);
+          });
+        }}
         playedCount={playedCount}
         stopCount={manifest.stops.length}
       />
@@ -285,16 +305,21 @@ function PublishedTourView({
 function TourProgressPanel({
   completedAt,
   isComplete,
+  isResetting,
+  onReset,
   playedCount,
   stopCount
 }: {
   completedAt: string | null;
   isComplete: boolean;
+  isResetting: boolean;
+  onReset: () => void;
   playedCount: number;
   stopCount: number;
 }) {
   const progressPercent =
     stopCount > 0 ? Math.min(100, (playedCount / stopCount) * 100) : 0;
+  const hasProgress = playedCount > 0;
 
   return (
     <View style={styles.progressPanel}>
@@ -322,6 +347,15 @@ function TourProgressPanel({
           ? `Completed ${formatDisplayTimestamp(completedAt)}`
           : "Play stop audio to mark progress on this device."}
       </Text>
+      {hasProgress ? (
+        <ActionButton
+          disabled={isResetting}
+          iconName="refresh"
+          label={isResetting ? "Resetting..." : "Reset progress"}
+          onPress={onReset}
+          variant="danger"
+        />
+      ) : null}
     </View>
   );
 }

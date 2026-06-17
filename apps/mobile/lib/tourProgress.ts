@@ -106,6 +106,10 @@ export async function clearTourProgressStates(): Promise<number> {
   return progressKeys.length;
 }
 
+export async function clearTourProgressState(tourCode: string): Promise<void> {
+  await AsyncStorage.removeItem(createProgressKey(tourCode));
+}
+
 export function getProgressSummary({
   playedCount,
   stopCount

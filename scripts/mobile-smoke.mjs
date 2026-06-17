@@ -39,8 +39,14 @@ async function main() {
     await page.navigate(`${MOBILE_WEB_URL}/`);
     await page.evaluate("localStorage.clear(); true");
     await page.navigate(`${MOBILE_WEB_URL}/`);
-    await waitForText(page, ["Enter tour code", "OFFLINE CACHE"]);
-    await assertText(page, ["TOURS", "0", "AUDIO", "0 files"]);
+    await waitForText(page, [
+      "Enter tour code",
+      "OFFLINE CACHE",
+      "TOURS",
+      "0",
+      "AUDIO",
+      "0 files"
+    ]);
     console.log("Entry screen renders with empty offline cache.");
 
     await page.navigate(`${MOBILE_WEB_URL}/tour/OLDTOWN`);
@@ -113,6 +119,12 @@ async function main() {
     await waitForText(page, ["Tour complete", "3 of 3 stops played"]);
     console.log("Played-stop progress reaches tour completion.");
 
+    await page.navigate(`${MOBILE_WEB_URL}/tour/OLDTOWN`);
+    await waitForText(page, ["Tour complete", "Reset progress"]);
+    await clickByText(page, "Reset progress");
+    await waitForText(page, ["0 of 3 stops played", "NOT PLAYED"]);
+    console.log("Tour progress can be reset for the current tour.");
+
     await page.navigate(`${MOBILE_WEB_URL}/tour/BADJSON`);
     await waitForText(page, ["Manifest is invalid"]);
     await assertText(page, [
@@ -131,10 +143,10 @@ async function main() {
     await waitForText(page, ["Old Town Loop", "TOURS"]);
     await assertText(page, [
       "CONTINUE",
-      "Continue stop",
-      "Tour complete",
+      "Continue route",
+      "Route map",
       "Victoria - 3 stops",
-      "Complete",
+      "0/3 played",
       "Published",
       "Hash",
       "Open",

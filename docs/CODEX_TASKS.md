@@ -14,7 +14,7 @@ Use this list to keep early work sequenced.
 
 ## Mobile
 
-- Add per-tour progress reset controls for visitors.
+- Add per-stop audio download status on the route screen.
 
 ## Completed Foundation Slices
 
@@ -42,6 +42,7 @@ Use this list to keep early work sequenced.
 - Added mobile offline UX polish, cached manifest metadata, and retry controls.
 - Added mobile tour resume, cached-tour reopening, and stop deep-link fallback polish.
 - Added played-stop progress markers and local tour completion state.
+- Added per-tour progress reset controls for visitors.
 
 ## Backend
 
