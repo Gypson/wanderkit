@@ -54,6 +54,7 @@ async function main() {
     await assertText(page, [
       "0 of 3 stops played",
       "Streaming only",
+      "Download unavailable",
       "3 route points - 3 stops",
       "Market Square",
       "Johnson Street",
@@ -102,6 +103,7 @@ async function main() {
       "Route preview",
       "1 of 3 stops played",
       "Streaming only",
+      "Download unavailable",
       "Played"
     ]);
     console.log("Bad stop deep links offer a route fallback.");

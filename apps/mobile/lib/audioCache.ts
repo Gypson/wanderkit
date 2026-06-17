@@ -24,6 +24,11 @@ export type AudioCacheStatus = "downloaded" | "not-downloaded" | "unavailable";
 
 export type AudioCacheStatusByStopId = Record<string, AudioCacheStatus>;
 
+export type AudioCacheDownloadResult = {
+  message: string;
+  status: AudioCacheStatus;
+};
+
 const AUDIO_CACHE_DIR = `${FileSystem.documentDirectory ?? ""}wanderkit-audio/`;
 
 export async function getCachedAudioUri({
@@ -166,6 +171,37 @@ export async function getCachedAudioStatuses({
   );
 
   return Object.fromEntries(entries);
+}
+
+export async function downloadAudioForStop({
+  audioUrl,
+  stopId,
+  tourCode
+}: {
+  audioUrl: string;
+  stopId: string;
+  tourCode: string;
+}): Promise<AudioCacheDownloadResult> {
+  const result = await getCachedAudioUri({ audioUrl, stopId, tourCode });
+
+  if (result.source === "cache") {
+    return {
+      status: "downloaded",
+      message: "Audio already saved."
+    };
+  }
+
+  if (result.source === "download") {
+    return {
+      status: "downloaded",
+      message: "Audio saved for offline replay."
+    };
+  }
+
+  return {
+    status: FileSystem.documentDirectory ? "not-downloaded" : "unavailable",
+    message: result.message
+  };
 }
 
 export async function clearAudioCache(): Promise<AudioCacheSummary> {

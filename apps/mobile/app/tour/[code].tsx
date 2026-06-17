@@ -17,6 +17,7 @@ import type { PublishedStop, PublishedTourManifest } from "@wanderkit/shared";
 import { StatePanel } from "../../components/StatePanel";
 import { TourMap } from "../../components/TourMap";
 import {
+  downloadAudioForStop,
   getCachedAudioStatuses,
   type AudioCacheStatus,
   type AudioCacheStatusByStopId
@@ -148,6 +149,12 @@ function PublishedTourView({
   const [audioStatuses, setAudioStatuses] = useState<AudioCacheStatusByStopId>(
     {}
   );
+  const [audioDownloadMessage, setAudioDownloadMessage] = useState<
+    string | null
+  >(null);
+  const [downloadingStopId, setDownloadingStopId] = useState<string | null>(
+    null
+  );
   const [isResettingProgress, setIsResettingProgress] = useState(false);
   const selectedStop = useMemo(
     () =>
@@ -164,6 +171,10 @@ function PublishedTourView({
   ).length;
   const isTourComplete =
     manifest.stops.length > 0 && playedCount === manifest.stops.length;
+
+  useEffect(() => {
+    setAudioDownloadMessage(null);
+  }, [selectedStopId]);
 
   useEffect(() => {
     saveVisitorResumeTour(manifest).catch(() => {
@@ -220,6 +231,33 @@ function PublishedTourView({
     }
   };
 
+  const downloadStopAudio = async (stop: PublishedStop) => {
+    setAudioDownloadMessage(null);
+    setDownloadingStopId(stop.id);
+
+    try {
+      const result = await downloadAudioForStop({
+        audioUrl: stop.audioUrl,
+        stopId: stop.id,
+        tourCode: manifest.tourCode
+      });
+
+      setAudioStatuses((currentStatuses) => ({
+        ...currentStatuses,
+        [stop.id]: result.status
+      }));
+      setAudioDownloadMessage(result.message);
+    } catch (error) {
+      setAudioDownloadMessage(
+        error instanceof Error
+          ? error.message
+          : "Audio could not be downloaded."
+      );
+    } finally {
+      setDownloadingStopId(null);
+    }
+  };
+
   return (
     <>
       <View style={styles.header}>
@@ -260,7 +298,19 @@ function PublishedTourView({
       {selectedStop ? (
         <SelectedStopPanel
           audioStatus={audioStatuses[selectedStop.id] ?? "unavailable"}
+          downloadMessage={audioDownloadMessage}
           isPlayed={isStopPlayed(progress, selectedStop.id)}
+          isDownloadingAudio={downloadingStopId === selectedStop.id}
+          onDownloadAudio={() => {
+            downloadStopAudio(selectedStop).catch((error) => {
+              setAudioDownloadMessage(
+                error instanceof Error
+                  ? error.message
+                  : "Audio could not be downloaded."
+              );
+              setDownloadingStopId(null);
+            });
+          }}
           stop={selectedStop}
         />
       ) : null}
@@ -380,13 +430,24 @@ function TourProgressPanel({
 
 function SelectedStopPanel({
   audioStatus,
+  downloadMessage,
   isPlayed,
+  isDownloadingAudio,
+  onDownloadAudio,
   stop
 }: {
   audioStatus: AudioCacheStatus;
+  downloadMessage: string | null;
   isPlayed: boolean;
+  isDownloadingAudio: boolean;
+  onDownloadAudio: () => void;
   stop: PublishedStop;
 }) {
+  const downloadAction = getAudioDownloadAction({
+    audioStatus,
+    isDownloading: isDownloadingAudio
+  });
+
   return (
     <View style={styles.selectedPanel}>
       <View style={styles.selectedHeader}>
@@ -405,6 +466,17 @@ function SelectedStopPanel({
       </View>
       <Text style={styles.selectedTitle}>{stop.title}</Text>
       <Text style={styles.selectedSummary}>{stop.summary}</Text>
+      <View style={styles.selectedAudioActions}>
+        <ActionButton
+          disabled={downloadAction.disabled}
+          iconName={downloadAction.iconName}
+          label={downloadAction.label}
+          onPress={onDownloadAudio}
+        />
+        {downloadMessage ? (
+          <Text style={styles.selectedDownloadMessage}>{downloadMessage}</Text>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -445,6 +517,48 @@ function formatAudioStatusLabel(status: AudioCacheStatus): string {
   }
 
   return "Streaming only";
+}
+
+function getAudioDownloadAction({
+  audioStatus,
+  isDownloading
+}: {
+  audioStatus: AudioCacheStatus;
+  isDownloading: boolean;
+}): {
+  disabled: boolean;
+  iconName: "checkmark" | "cloud-download" | "cloud-offline" | "refresh";
+  label: string;
+} {
+  if (isDownloading) {
+    return {
+      disabled: true,
+      iconName: "refresh",
+      label: "Downloading..."
+    };
+  }
+
+  if (audioStatus === "downloaded") {
+    return {
+      disabled: true,
+      iconName: "checkmark",
+      label: "Audio saved"
+    };
+  }
+
+  if (audioStatus === "unavailable") {
+    return {
+      disabled: true,
+      iconName: "cloud-offline",
+      label: "Download unavailable"
+    };
+  }
+
+  return {
+    disabled: false,
+    iconName: "cloud-download",
+    label: "Download audio"
+  };
 }
 
 function formatDuration(seconds: number | undefined): string {
@@ -596,6 +710,16 @@ const styles = StyleSheet.create({
     color: "#dbe7df",
     fontSize: 15,
     lineHeight: 22
+  },
+  selectedAudioActions: {
+    alignItems: "flex-start",
+    gap: 8,
+    marginTop: 4
+  },
+  selectedDownloadMessage: {
+    color: "#dbe7df",
+    fontSize: 13,
+    lineHeight: 19
   },
   stopList: {
     gap: 12,
