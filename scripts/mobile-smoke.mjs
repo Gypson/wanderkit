@@ -76,7 +76,12 @@ async function main() {
     await page.evaluate(`
       (() => {
         window.__wanderkitOriginalFetch = window.fetch;
-        window.fetch = () => Promise.reject(new Error("Smoke forced offline lookup."));
+        window.fetch = () => new Promise((resolve, reject) => {
+          window.setTimeout(
+            () => reject(new Error("Smoke forced offline lookup.")),
+            750
+          );
+        });
         return true;
       })()
     `);
@@ -88,7 +93,16 @@ async function main() {
       "OLDTOWN"
     ]);
     await clickByText(page, "Check for updates");
-    await waitForText(page, ["SAVED TOUR COPY", "Check for updates"]);
+    await waitForText(page, [
+      "SAVED TOUR COPY",
+      "Checking...",
+      "Checking Supabase for updates."
+    ]);
+    await waitForText(page, [
+      "SAVED TOUR COPY",
+      "Still using saved copy. Could not reach Supabase.",
+      "Check for updates"
+    ]);
     await page.evaluate(`
       (() => {
         if (window.__wanderkitOriginalFetch) {

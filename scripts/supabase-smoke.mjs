@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const HASH_PATTERN = /^sha256-[0-9a-f]{64}$/;
+const REQUEST_TIMEOUT_MS = 10000;
 
 const fileEnv = loadEnvFiles([".env", ".env.local"]);
 const statusEnv = loadSupabaseStatusEnv();
@@ -86,6 +87,7 @@ async function assertManifestRowsAreImmutable(id, key) {
       authorization: `Bearer ${key}`,
       "content-type": "application/json"
     },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     body: JSON.stringify({
       content_hash:
         "sha256-1111111111111111111111111111111111111111111111111111111111111111"
@@ -102,7 +104,8 @@ async function requestJson(url, key) {
     headers: {
       apikey: key,
       authorization: `Bearer ${key}`
-    }
+    },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
   });
 
   if (!response.ok) {
@@ -144,7 +147,8 @@ function loadSupabaseStatusEnv() {
   try {
     const output = execSync("supabase status -o env", {
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"]
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 5000
     });
 
     return output.split(/\r?\n/).reduce((values, line) => {

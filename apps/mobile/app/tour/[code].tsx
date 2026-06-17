@@ -11,7 +11,10 @@ import {
   View
 } from "react-native";
 import { ActionButton } from "../../components/ActionButton";
-import { CachedManifestNotice } from "../../components/CachedManifestNotice";
+import {
+  CachedManifestNotice,
+  ManifestRefreshStatusNotice
+} from "../../components/CachedManifestNotice";
 import { RetryButton } from "../../components/RetryButton";
 import type { PublishedStop, PublishedTourManifest } from "@wanderkit/shared";
 import { StatePanel } from "../../components/StatePanel";
@@ -35,18 +38,29 @@ import {
   type TourProgressState
 } from "../../lib/tourProgress";
 import type { TourLookupState } from "../../lib/tourLookup";
-import { useTourLookup } from "../../lib/useTourLookup";
+import {
+  useTourLookup,
+  type TourLookupRefreshState
+} from "../../lib/useTourLookup";
 import { saveVisitorResumeTour } from "../../lib/visitorResume";
 
 export default function TourScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
-  const { lookupState, normalizedCode, retryLookup } = useTourLookup(code);
+  const {
+    lookupState,
+    normalizedCode,
+    refreshLookup,
+    refreshState,
+    retryLookup
+  } = useTourLookup(code);
 
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <TourLookupContent
+          onRefresh={() => void refreshLookup()}
           onRetry={() => void retryLookup()}
+          refreshState={refreshState}
           state={lookupState}
           tourCode={normalizedCode}
         />
@@ -56,11 +70,15 @@ export default function TourScreen() {
 }
 
 function TourLookupContent({
+  onRefresh,
   onRetry,
+  refreshState,
   state,
   tourCode
 }: {
+  onRefresh: () => void;
   onRetry: () => void;
+  refreshState: TourLookupRefreshState;
   state: TourLookupState;
   tourCode: string;
 }) {
@@ -130,7 +148,8 @@ function TourLookupContent({
           : null
       }
       manifest={state.manifest}
-      onRefreshManifest={onRetry}
+      onRefreshManifest={onRefresh}
+      refreshState={refreshState}
     />
   );
 }
@@ -138,7 +157,8 @@ function TourLookupContent({
 function PublishedTourView({
   cacheMetadata,
   manifest,
-  onRefreshManifest
+  onRefreshManifest,
+  refreshState
 }: {
   cacheMetadata: {
     cachedAt: string | null;
@@ -146,6 +166,7 @@ function PublishedTourView({
   } | null;
   manifest: PublishedTourManifest;
   onRefreshManifest: () => void;
+  refreshState: TourLookupRefreshState;
 }) {
   const router = useRouter();
   const [selectedStopId, setSelectedStopId] = useState<string | null>(null);
@@ -437,10 +458,16 @@ function PublishedTourView({
         <CachedManifestNotice
           cachedAt={cacheMetadata.cachedAt}
           contentHash={manifest.contentHash}
+          isRefreshing={refreshState.status === "refreshing"}
           onRefresh={onRefreshManifest}
           publishedAt={manifest.publishedAt}
           reason={cacheMetadata.reason}
+          refreshMessage={
+            refreshState.status === "error" ? refreshState.message : null
+          }
         />
+      ) : refreshState.status === "success" ? (
+        <ManifestRefreshStatusNotice message={refreshState.message} />
       ) : null}
 
       <TourProgressPanel

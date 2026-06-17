@@ -14,6 +14,7 @@ export function CachedManifestNotice({
   onRefresh,
   publishedAt,
   reason,
+  refreshMessage = null,
   title = "Saved tour copy"
 }: {
   cachedAt: string | null;
@@ -22,6 +23,7 @@ export function CachedManifestNotice({
   onRefresh?: () => void;
   publishedAt: string;
   reason: CachedManifestReason;
+  refreshMessage?: string | null;
   title?: string;
 }) {
   return (
@@ -40,6 +42,14 @@ export function CachedManifestNotice({
         />
         <CacheMeta label="Hash" value={formatShortContentHash(contentHash)} />
       </View>
+      {isRefreshing ? (
+        <Text style={styles.cacheRefreshMessage}>
+          Checking Supabase for updates.
+        </Text>
+      ) : null}
+      {refreshMessage ? (
+        <Text style={styles.cacheRefreshMessage}>{refreshMessage}</Text>
+      ) : null}
       {onRefresh ? (
         <ActionButton
           disabled={isRefreshing}
@@ -48,6 +58,19 @@ export function CachedManifestNotice({
           onPress={onRefresh}
         />
       ) : null}
+    </View>
+  );
+}
+
+export function ManifestRefreshStatusNotice({
+  message
+}: {
+  message: string;
+}) {
+  return (
+    <View style={styles.refreshStatusBanner}>
+      <Text style={styles.refreshStatusTitle}>Tour refreshed</Text>
+      <Text style={styles.refreshStatusBody}>{message}</Text>
     </View>
   );
 }
@@ -83,6 +106,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20
   },
+  cacheRefreshMessage: {
+    backgroundColor: "#fffaf0",
+    borderRadius: 8,
+    color: "#5f4b2a",
+    fontSize: 13,
+    lineHeight: 19,
+    padding: 10
+  },
   cacheMetaRow: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -108,5 +139,26 @@ const styles = StyleSheet.create({
     color: "#3f321c",
     fontSize: 12,
     fontWeight: "800"
+  },
+  refreshStatusBanner: {
+    backgroundColor: "#eaf4f4",
+    borderColor: "#bfd8ca",
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 6,
+    marginTop: 16,
+    padding: 14
+  },
+  refreshStatusTitle: {
+    color: "#2d6a4f",
+    fontSize: 13,
+    fontWeight: "800",
+    letterSpacing: 1,
+    textTransform: "uppercase"
+  },
+  refreshStatusBody: {
+    color: "#27453a",
+    fontSize: 14,
+    lineHeight: 20
   }
 });

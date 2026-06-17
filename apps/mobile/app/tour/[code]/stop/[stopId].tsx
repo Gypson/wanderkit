@@ -17,7 +17,10 @@ import {
   View
 } from "react-native";
 import { ActionButton } from "../../../../components/ActionButton";
-import { CachedManifestNotice } from "../../../../components/CachedManifestNotice";
+import {
+  CachedManifestNotice,
+  ManifestRefreshStatusNotice
+} from "../../../../components/CachedManifestNotice";
 import { RetryButton } from "../../../../components/RetryButton";
 import { StatePanel } from "../../../../components/StatePanel";
 import { getCachedAudioUri, type CachedAudioResult } from "../../../../lib/audioCache";
@@ -30,7 +33,10 @@ import {
   type TourProgressState
 } from "../../../../lib/tourProgress";
 import type { TourLookupState } from "../../../../lib/tourLookup";
-import { useTourLookup } from "../../../../lib/useTourLookup";
+import {
+  useTourLookup,
+  type TourLookupRefreshState
+} from "../../../../lib/useTourLookup";
 import { saveVisitorResumeStop } from "../../../../lib/visitorResume";
 
 export default function StopDetailScreen() {
@@ -39,7 +45,13 @@ export default function StopDetailScreen() {
     code: string;
     stopId: string;
   }>();
-  const { lookupState, normalizedCode, retryLookup } = useTourLookup(code);
+  const {
+    lookupState,
+    normalizedCode,
+    refreshLookup,
+    refreshState,
+    retryLookup
+  } = useTourLookup(code);
   const selectedStopId = normalizeParam(stopId);
   const openRoute = () => {
     router.replace(`/tour/${encodeURIComponent(normalizedCode)}`);
@@ -55,7 +67,9 @@ export default function StopDetailScreen() {
 
         <StopDetailContent
           onOpenRoute={openRoute}
+          onRefresh={() => void refreshLookup()}
           onRetry={() => void retryLookup()}
+          refreshState={refreshState}
           selectedStopId={selectedStopId}
           state={lookupState}
           tourCode={normalizedCode}
@@ -67,13 +81,17 @@ export default function StopDetailScreen() {
 
 function StopDetailContent({
   onOpenRoute,
+  onRefresh,
   onRetry,
+  refreshState,
   selectedStopId,
   state,
   tourCode
 }: {
   onOpenRoute: () => void;
+  onRefresh: () => void;
   onRetry: () => void;
+  refreshState: TourLookupRefreshState;
   selectedStopId: string;
   state: TourLookupState;
   tourCode: string;
@@ -166,7 +184,8 @@ function StopDetailContent({
           : null
       }
       manifest={state.manifest}
-      onRefreshManifest={onRetry}
+      onRefreshManifest={onRefresh}
+      refreshState={refreshState}
       stop={stop}
     />
   );
@@ -176,6 +195,7 @@ function PlayableStop({
   cacheMetadata,
   manifest,
   onRefreshManifest,
+  refreshState,
   stop
 }: {
   cacheMetadata: {
@@ -184,6 +204,7 @@ function PlayableStop({
   } | null;
   manifest: PublishedTourManifest;
   onRefreshManifest: () => void;
+  refreshState: TourLookupRefreshState;
   stop: PublishedStop;
 }) {
   const [progress, setProgress] = useState<TourProgressState>(() =>
@@ -243,11 +264,17 @@ function PlayableStop({
         <CachedManifestNotice
           cachedAt={cacheMetadata.cachedAt}
           contentHash={manifest.contentHash}
+          isRefreshing={refreshState.status === "refreshing"}
           onRefresh={onRefreshManifest}
           publishedAt={manifest.publishedAt}
           reason={cacheMetadata.reason}
+          refreshMessage={
+            refreshState.status === "error" ? refreshState.message : null
+          }
           title="Saved stop details"
         />
+      ) : refreshState.status === "success" ? (
+        <ManifestRefreshStatusNotice message={refreshState.message} />
       ) : null}
 
       <View style={styles.coordinatePanel}>
