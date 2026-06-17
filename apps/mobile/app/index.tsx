@@ -22,6 +22,7 @@ import {
   type CachedManifestSummary
 } from "../lib/manifestCache";
 import {
+  formatBytes,
   formatDisplayTimestamp,
   formatShortContentHash
 } from "../lib/format";
@@ -426,20 +427,6 @@ function formatCompactProgress(
   return stopCount > 0
     ? `${progress.playedStopIds.length}/${stopCount} played`
     : `${progress.playedStopIds.length} played`;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes <= 0) {
-    return "0 MB";
-  }
-
-  const megabytes = bytes / (1024 * 1024);
-
-  if (megabytes < 0.1) {
-    return "<0.1 MB";
-  }
-
-  return `${megabytes.toFixed(1)} MB`;
 }
 
 const styles = StyleSheet.create({

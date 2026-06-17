@@ -20,10 +20,12 @@ import {
   clearCachedAudioForStops,
   downloadAudioForStop,
   getCachedAudioStatuses,
+  getCachedAudioSummaryForStops,
+  type AudioCacheSummary,
   type AudioCacheStatus,
   type AudioCacheStatusByStopId
 } from "../../lib/audioCache";
-import { formatDisplayTimestamp } from "../../lib/format";
+import { formatBytes, formatDisplayTimestamp } from "../../lib/format";
 import {
   clearTourProgressState,
   createEmptyTourProgress,
@@ -150,6 +152,9 @@ function PublishedTourView({
   const [audioStatuses, setAudioStatuses] = useState<AudioCacheStatusByStopId>(
     {}
   );
+  const [tourAudioSummary, setTourAudioSummary] = useState<AudioCacheSummary>(
+    () => createEmptyAudioCacheSummary()
+  );
   const [audioDownloadMessage, setAudioDownloadMessage] = useState<
     string | null
   >(null);
@@ -200,6 +205,22 @@ function PublishedTourView({
     });
   }, [manifest]);
 
+  const refreshTourAudioSummary = useCallback(async () => {
+    try {
+      const summary = await getCachedAudioSummaryForStops({
+        stops: manifest.stops,
+        tourCode: manifest.tourCode
+      });
+
+      setTourAudioSummary(summary);
+      return summary;
+    } catch {
+      const emptySummary = createEmptyAudioCacheSummary();
+      setTourAudioSummary(emptySummary);
+      return emptySummary;
+    }
+  }, [manifest.stops, manifest.tourCode]);
+
   useFocusEffect(
     useCallback(() => {
       let isMounted = true;
@@ -209,12 +230,17 @@ function PublishedTourView({
         getCachedAudioStatuses({
           stops: manifest.stops,
           tourCode: manifest.tourCode
+        }),
+        getCachedAudioSummaryForStops({
+          stops: manifest.stops,
+          tourCode: manifest.tourCode
         })
       ])
-        .then(([nextProgress, nextAudioStatuses]) => {
+        .then(([nextProgress, nextAudioStatuses, nextAudioSummary]) => {
           if (isMounted) {
             setProgress(nextProgress);
             setAudioStatuses(nextAudioStatuses);
+            setTourAudioSummary(nextAudioSummary);
             setTourAudioDownload((currentDownload) =>
               currentDownload.status === "idle"
                 ? {
@@ -230,6 +256,7 @@ function PublishedTourView({
           if (isMounted) {
             setProgress(createEmptyTourProgress(manifest.tourCode));
             setAudioStatuses({});
+            setTourAudioSummary(createEmptyAudioCacheSummary());
           }
         });
 
@@ -274,6 +301,7 @@ function PublishedTourView({
         [stop.id]: result.status
       }));
       setAudioDownloadMessage(result.message);
+      await refreshTourAudioSummary();
     } catch (error) {
       setAudioDownloadMessage(
         error instanceof Error
@@ -344,6 +372,7 @@ function PublishedTourView({
         processedCount: manifest.stops.length,
         status: "idle"
       });
+      await refreshTourAudioSummary();
     } catch (error) {
       setTourAudioDownload({
         message:
@@ -375,6 +404,7 @@ function PublishedTourView({
       });
 
       setAudioStatuses(nextAudioStatuses);
+      setTourAudioSummary(createEmptyAudioCacheSummary());
       setTourAudioDownload({
         message: formatClearAudioMessage(summary.fileCount),
         processedCount: 0,
@@ -423,6 +453,7 @@ function PublishedTourView({
       />
 
       <TourAudioDownloadPanel
+        audioSummary={tourAudioSummary}
         isAllSaved={isAllAudioSaved}
         isClearing={tourAudioDownload.status === "clearing"}
         isRunning={tourAudioDownload.status === "running"}
@@ -540,6 +571,7 @@ function PublishedTourView({
 }
 
 function TourAudioDownloadPanel({
+  audioSummary,
   isAllSaved,
   isClearing,
   isRunning,
@@ -551,6 +583,7 @@ function TourAudioDownloadPanel({
   savedCount,
   stopCount
 }: {
+  audioSummary: AudioCacheSummary;
   isAllSaved: boolean;
   isClearing: boolean;
   isRunning: boolean;
@@ -581,6 +614,14 @@ function TourAudioDownloadPanel({
             ? `Downloading ${processedCount} of ${stopCount} stops.`
             : "Save stop audio on this device for offline replay."}
         </Text>
+        <View style={styles.downloadMetaRow}>
+          <Text style={styles.downloadMetaText}>
+            {formatSavedAudioFiles(audioSummary.fileCount)}
+          </Text>
+          <Text style={styles.downloadMetaText}>
+            {formatSavedAudioSize(audioSummary.sizeBytes)}
+          </Text>
+        </View>
       </View>
       <View style={styles.downloadActions}>
         <ActionButton
@@ -871,6 +912,21 @@ function formatClearAudioMessage(fileCount: number): string {
   return `Cleared ${fileCount} saved audio file${fileCount === 1 ? "" : "s"}.`;
 }
 
+function formatSavedAudioFiles(fileCount: number): string {
+  return `${fileCount} file${fileCount === 1 ? "" : "s"} saved`;
+}
+
+function formatSavedAudioSize(sizeBytes: number): string {
+  return `${formatBytes(sizeBytes)} saved`;
+}
+
+function createEmptyAudioCacheSummary(): AudioCacheSummary {
+  return {
+    fileCount: 0,
+    sizeBytes: 0
+  };
+}
+
 function formatDuration(seconds: number | undefined): string {
   if (!seconds) {
     return "Audio";
@@ -1000,6 +1056,18 @@ const styles = StyleSheet.create({
     color: "#53615a",
     fontSize: 13,
     lineHeight: 19
+  },
+  downloadMetaRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 4
+  },
+  downloadMetaText: {
+    color: "#2d6a4f",
+    fontSize: 12,
+    fontWeight: "800"
   },
   downloadActions: {
     alignItems: "center",

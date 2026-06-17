@@ -55,6 +55,8 @@ async function main() {
       "Route preview",
       "AUDIO DOWNLOADS",
       "0 of 3 stops saved",
+      "0 files saved",
+      "0 MB saved",
       "Download all unavailable",
       "Clear saved audio"
     ]);

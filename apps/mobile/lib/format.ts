@@ -22,3 +22,17 @@ export function formatDisplayTimestamp(
 export function formatShortContentHash(value: string): string {
   return value.length > 10 ? value.slice(0, 10) : value;
 }
+
+export function formatBytes(bytes: number): string {
+  if (bytes <= 0) {
+    return "0 MB";
+  }
+
+  const megabytes = bytes / (1024 * 1024);
+
+  if (megabytes < 0.1) {
+    return "<0.1 MB";
+  }
+
+  return `${megabytes.toFixed(1)} MB`;
+}

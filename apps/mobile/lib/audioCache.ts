@@ -126,6 +126,16 @@ export async function getAudioCacheSummary(): Promise<AudioCacheSummary> {
   };
 }
 
+export async function getCachedAudioSummaryForStops({
+  stops,
+  tourCode
+}: {
+  stops: Array<{ audioUrl: string; id: string }>;
+  tourCode: string;
+}): Promise<AudioCacheSummary> {
+  return summarizeCachedAudioForStops({ stops, tourCode });
+}
+
 export async function getCachedAudioStatus({
   audioUrl,
   stopId,
@@ -227,6 +237,24 @@ export async function clearCachedAudioForStops({
   stops: Array<{ audioUrl: string; id: string }>;
   tourCode: string;
 }): Promise<AudioCacheSummary> {
+  return summarizeCachedAudioForStops({
+    stops,
+    tourCode,
+    onCachedFile: async (fileUri) => {
+      await FileSystem.deleteAsync(fileUri, { idempotent: true });
+    }
+  });
+}
+
+async function summarizeCachedAudioForStops({
+  onCachedFile,
+  stops,
+  tourCode
+}: {
+  onCachedFile?: (fileUri: string) => Promise<void>;
+  stops: Array<{ audioUrl: string; id: string }>;
+  tourCode: string;
+}): Promise<AudioCacheSummary> {
   if (!FileSystem.documentDirectory || stops.length === 0) {
     return {
       fileCount: 0,
@@ -257,7 +285,7 @@ export async function clearCachedAudioForStops({
     if (file.exists && !file.isDirectory) {
       fileCount += 1;
       sizeBytes += file.size;
-      await FileSystem.deleteAsync(localUri, { idempotent: true });
+      await onCachedFile?.(localUri);
     }
   }
 
