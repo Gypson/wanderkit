@@ -1,12 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
-import type { PublishedStop } from "@wanderkit/shared";
+import type { PublishedStop, PublishedTourManifest } from "@wanderkit/shared";
 import {
   setAudioModeAsync,
   useAudioPlayer,
   useAudioPlayerStatus
 } from "expo-audio";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -16,13 +16,12 @@ import {
   Text,
   View
 } from "react-native";
+import { CachedManifestNotice } from "../../../../components/CachedManifestNotice";
+import { RetryButton } from "../../../../components/RetryButton";
 import { StatePanel } from "../../../../components/StatePanel";
 import { getCachedAudioUri, type CachedAudioResult } from "../../../../lib/audioCache";
-import {
-  loadPublishedTourManifest,
-  normalizeTourCode,
-  type TourLookupState
-} from "../../../../lib/tourLookup";
+import type { TourLookupState } from "../../../../lib/tourLookup";
+import { useTourLookup } from "../../../../lib/useTourLookup";
 
 export default function StopDetailScreen() {
   const router = useRouter();
@@ -30,30 +29,8 @@ export default function StopDetailScreen() {
     code: string;
     stopId: string;
   }>();
-  const normalizedCode = normalizeTourCode(code);
+  const { lookupState, normalizedCode, retryLookup } = useTourLookup(code);
   const selectedStopId = normalizeParam(stopId);
-  const [lookupState, setLookupState] = useState<TourLookupState>({
-    status: "loading"
-  });
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadManifest() {
-      setLookupState({ status: "loading" });
-      const nextState = await loadPublishedTourManifest(normalizedCode);
-
-      if (isMounted) {
-        setLookupState(nextState);
-      }
-    }
-
-    void loadManifest();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [normalizedCode]);
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -64,6 +41,7 @@ export default function StopDetailScreen() {
         </Pressable>
 
         <StopDetailContent
+          onRetry={() => void retryLookup()}
           selectedStopId={selectedStopId}
           state={lookupState}
           tourCode={normalizedCode}
@@ -74,10 +52,12 @@ export default function StopDetailScreen() {
 }
 
 function StopDetailContent({
+  onRetry,
   selectedStopId,
   state,
   tourCode
 }: {
+  onRetry: () => void;
   selectedStopId: string;
   state: TourLookupState;
   tourCode: string;
@@ -95,9 +75,11 @@ function StopDetailContent({
   if (state.status === "config-missing") {
     return (
       <StatePanel
+        action={<RetryButton onPress={onRetry} />}
         body="Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to load published stops."
         code={tourCode}
         title="Supabase is not configured"
+        tone="warning"
       />
     );
   }
@@ -105,6 +87,7 @@ function StopDetailContent({
   if (state.status === "not-found") {
     return (
       <StatePanel
+        action={<RetryButton onPress={onRetry} />}
         body="No published tour exists for this code."
         code={state.code}
         title="Tour not found"
@@ -115,10 +98,12 @@ function StopDetailContent({
   if (state.status === "invalid") {
     return (
       <StatePanel
+        action={<RetryButton onPress={onRetry} />}
         body="This code returned JSON, but it does not match the published manifest contract."
         code={state.code}
         details={state.issues}
         title="Manifest is invalid"
+        tone="warning"
       />
     );
   }
@@ -126,9 +111,11 @@ function StopDetailContent({
   if (state.status === "error") {
     return (
       <StatePanel
+        action={<RetryButton onPress={onRetry} />}
         body={state.message}
         code={tourCode}
         title="Could not load stop"
+        tone="danger"
       />
     );
   }
@@ -140,43 +127,57 @@ function StopDetailContent({
   if (!stop) {
     return (
       <StatePanel
+        action={<RetryButton label="Reload tour" onPress={onRetry} />}
         body="This stop is not present in the published manifest."
         code={tourCode}
         title="Stop not found"
+        tone="warning"
       />
     );
   }
 
   return (
     <PlayableStop
-      cacheReason={state.status === "cached" ? state.reason : null}
-      manifestTitle={state.manifest.title}
+      cacheMetadata={
+        state.status === "cached"
+          ? { cachedAt: state.cachedAt, reason: state.reason }
+          : null
+      }
+      manifest={state.manifest}
       stop={stop}
-      tourCode={state.manifest.tourCode}
     />
   );
 }
 
 function PlayableStop({
-  cacheReason,
-  manifestTitle,
-  stop,
-  tourCode
+  cacheMetadata,
+  manifest,
+  stop
 }: {
-  cacheReason: "config-missing" | "network-error" | null;
-  manifestTitle: string;
+  cacheMetadata: {
+    cachedAt: string | null;
+    reason: "config-missing" | "network-error";
+  } | null;
+  manifest: PublishedTourManifest;
   stop: PublishedStop;
-  tourCode: string;
 }) {
   return (
     <>
       <View style={styles.header}>
         <Text style={styles.stopNumber}>Stop {stop.number}</Text>
         <Text style={styles.title}>{stop.title}</Text>
-        <Text style={styles.subtitle}>{manifestTitle}</Text>
+        <Text style={styles.subtitle}>{manifest.title}</Text>
       </View>
 
-      {cacheReason ? <CachedManifestBanner reason={cacheReason} /> : null}
+      {cacheMetadata ? (
+        <CachedManifestNotice
+          cachedAt={cacheMetadata.cachedAt}
+          contentHash={manifest.contentHash}
+          publishedAt={manifest.publishedAt}
+          reason={cacheMetadata.reason}
+          title="Saved stop details"
+        />
+      ) : null}
 
       <View style={styles.coordinatePanel}>
         <View>
@@ -193,7 +194,7 @@ function PlayableStop({
         </View>
       </View>
 
-      <AudioControls stop={stop} tourCode={tourCode} />
+      <AudioControls stop={stop} tourCode={manifest.tourCode} />
 
       <View style={styles.notesPanel}>
         <Text style={styles.notesTitle}>About this stop</Text>
@@ -203,23 +204,6 @@ function PlayableStop({
         ) : null}
       </View>
     </>
-  );
-}
-
-function CachedManifestBanner({
-  reason
-}: {
-  reason: "config-missing" | "network-error";
-}) {
-  return (
-    <View style={styles.cacheBanner}>
-      <Text style={styles.cacheTitle}>Cached audio</Text>
-      <Text style={styles.cacheBody}>
-        {reason === "config-missing"
-          ? "Supabase is not configured, so this stop is loaded from the saved tour."
-          : "Network lookup failed, so this stop is loaded from the saved tour."}
-      </Text>
-    </View>
   );
 }
 
@@ -474,27 +458,6 @@ const styles = StyleSheet.create({
     color: "#53615a",
     fontSize: 16,
     lineHeight: 23
-  },
-  cacheBanner: {
-    backgroundColor: "#fff6df",
-    borderColor: "#ead39b",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 4,
-    marginTop: 18,
-    padding: 14
-  },
-  cacheTitle: {
-    color: "#7a4d10",
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 1,
-    textTransform: "uppercase"
-  },
-  cacheBody: {
-    color: "#5f4b2a",
-    fontSize: 14,
-    lineHeight: 20
   },
   coordinatePanel: {
     backgroundColor: "#ffffff",

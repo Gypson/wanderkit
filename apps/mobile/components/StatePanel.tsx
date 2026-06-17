@@ -1,23 +1,29 @@
 import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
+export type StatePanelTone = "danger" | "neutral" | "warning";
+
 export function StatePanel({
   action,
   body,
   code,
   details,
-  title
+  title,
+  tone = "neutral"
 }: {
   action?: ReactNode;
   body: string;
   code?: string;
   details?: string[];
   title: string;
+  tone?: StatePanelTone;
 }) {
   return (
-    <View style={styles.statePanel}>
+    <View style={[styles.statePanel, statePanelToneStyles[tone]]}>
       {code ? <Text style={styles.code}>{code}</Text> : null}
-      <Text style={styles.stateTitle}>{title}</Text>
+      <Text style={[styles.stateTitle, stateTitleToneStyles[tone]]}>
+        {title}
+      </Text>
       <Text style={styles.stateBody}>{body}</Text>
       {details?.slice(0, 4).map((detail) => (
         <Text key={detail} style={styles.issueText}>
@@ -31,8 +37,6 @@ export function StatePanel({
 
 const styles = StyleSheet.create({
   statePanel: {
-    backgroundColor: "#ffffff",
-    borderColor: "#e2e6e2",
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
@@ -51,7 +55,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6
   },
   stateTitle: {
-    color: "#16202a",
     fontSize: 25,
     fontWeight: "800",
     letterSpacing: 0
@@ -76,3 +79,29 @@ const styles = StyleSheet.create({
   }
 });
 
+const statePanelToneStyles = StyleSheet.create({
+  danger: {
+    backgroundColor: "#fff0ec",
+    borderColor: "#f0b8aa"
+  },
+  neutral: {
+    backgroundColor: "#ffffff",
+    borderColor: "#e2e6e2"
+  },
+  warning: {
+    backgroundColor: "#fff6df",
+    borderColor: "#ead39b"
+  }
+});
+
+const stateTitleToneStyles = StyleSheet.create({
+  danger: {
+    color: "#7a2f20"
+  },
+  neutral: {
+    color: "#16202a"
+  },
+  warning: {
+    color: "#7a4d10"
+  }
+});

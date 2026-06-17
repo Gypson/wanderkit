@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -9,54 +9,37 @@ import {
   Text,
   View
 } from "react-native";
+import { CachedManifestNotice } from "../../components/CachedManifestNotice";
+import { RetryButton } from "../../components/RetryButton";
 import type { PublishedStop, PublishedTourManifest } from "@wanderkit/shared";
 import { StatePanel } from "../../components/StatePanel";
 import { TourMap } from "../../components/TourMap";
-import {
-  loadPublishedTourManifest,
-  normalizeTourCode,
-  type TourLookupState
-} from "../../lib/tourLookup";
+import type { TourLookupState } from "../../lib/tourLookup";
+import { useTourLookup } from "../../lib/useTourLookup";
 
 export default function TourScreen() {
   const { code } = useLocalSearchParams<{ code: string }>();
-  const normalizedCode = normalizeTourCode(code);
-  const [lookupState, setLookupState] = useState<TourLookupState>({
-    status: "loading"
-  });
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadManifest() {
-      setLookupState({ status: "loading" });
-      const nextState = await loadPublishedTourManifest(normalizedCode);
-
-      if (isMounted) {
-        setLookupState(nextState);
-      }
-    }
-
-    void loadManifest();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [normalizedCode]);
+  const { lookupState, normalizedCode, retryLookup } = useTourLookup(code);
 
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
-        <TourLookupContent state={lookupState} tourCode={normalizedCode} />
+        <TourLookupContent
+          onRetry={() => void retryLookup()}
+          state={lookupState}
+          tourCode={normalizedCode}
+        />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 function TourLookupContent({
+  onRetry,
   state,
   tourCode
 }: {
+  onRetry: () => void;
   state: TourLookupState;
   tourCode: string;
 }) {
@@ -73,9 +56,11 @@ function TourLookupContent({
   if (state.status === "config-missing") {
     return (
       <StatePanel
+        action={<RetryButton onPress={onRetry} />}
         body="Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to load published manifests."
         code={tourCode}
         title="Supabase is not configured"
+        tone="warning"
       />
     );
   }
@@ -83,6 +68,7 @@ function TourLookupContent({
   if (state.status === "not-found") {
     return (
       <StatePanel
+        action={<RetryButton onPress={onRetry} />}
         body="No published tour exists for this code."
         code={state.code}
         title="Tour not found"
@@ -93,10 +79,12 @@ function TourLookupContent({
   if (state.status === "invalid") {
     return (
       <StatePanel
+        action={<RetryButton onPress={onRetry} />}
         body="This code returned JSON, but it does not match the published manifest contract."
         code={state.code}
         details={state.issues}
         title="Manifest is invalid"
+        tone="warning"
       />
     );
   }
@@ -104,26 +92,35 @@ function TourLookupContent({
   if (state.status === "error") {
     return (
       <StatePanel
+        action={<RetryButton onPress={onRetry} />}
         body={state.message}
         code={tourCode}
         title="Could not load tour"
+        tone="danger"
       />
     );
   }
 
   return (
     <PublishedTourView
-      cacheReason={state.status === "cached" ? state.reason : null}
+      cacheMetadata={
+        state.status === "cached"
+          ? { cachedAt: state.cachedAt, reason: state.reason }
+          : null
+      }
       manifest={state.manifest}
     />
   );
 }
 
 function PublishedTourView({
-  cacheReason,
+  cacheMetadata,
   manifest
 }: {
-  cacheReason: "config-missing" | "network-error" | null;
+  cacheMetadata: {
+    cachedAt: string | null;
+    reason: "config-missing" | "network-error";
+  } | null;
   manifest: PublishedTourManifest;
 }) {
   const router = useRouter();
@@ -150,7 +147,14 @@ function PublishedTourView({
         <Text style={styles.description}>{manifest.description}</Text>
       </View>
 
-      {cacheReason ? <CachedManifestBanner reason={cacheReason} /> : null}
+      {cacheMetadata ? (
+        <CachedManifestNotice
+          cachedAt={cacheMetadata.cachedAt}
+          contentHash={manifest.contentHash}
+          publishedAt={manifest.publishedAt}
+          reason={cacheMetadata.reason}
+        />
+      ) : null}
 
       <TourMap
         onStopPress={openStop}
@@ -188,23 +192,6 @@ function PublishedTourView({
         ))}
       </View>
     </>
-  );
-}
-
-function CachedManifestBanner({
-  reason
-}: {
-  reason: "config-missing" | "network-error";
-}) {
-  return (
-    <View style={styles.cacheBanner}>
-      <Text style={styles.cacheTitle}>Cached tour</Text>
-      <Text style={styles.cacheBody}>
-        {reason === "config-missing"
-          ? "Supabase is not configured, so this device is showing its saved copy."
-          : "Network lookup failed, so this device is showing its saved copy."}
-      </Text>
-    </View>
   );
 }
 
@@ -265,27 +252,6 @@ const styles = StyleSheet.create({
     color: "#53615a",
     fontSize: 16,
     lineHeight: 24
-  },
-  cacheBanner: {
-    backgroundColor: "#fff6df",
-    borderColor: "#ead39b",
-    borderRadius: 8,
-    borderWidth: 1,
-    gap: 4,
-    marginTop: 16,
-    padding: 14
-  },
-  cacheTitle: {
-    color: "#7a4d10",
-    fontSize: 13,
-    fontWeight: "800",
-    letterSpacing: 1,
-    textTransform: "uppercase"
-  },
-  cacheBody: {
-    color: "#5f4b2a",
-    fontSize: 14,
-    lineHeight: 20
   },
   selectedPanel: {
     backgroundColor: "#16202a",

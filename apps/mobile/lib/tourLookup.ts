@@ -5,7 +5,8 @@ import {
 } from "@wanderkit/supabase";
 import {
   cachePublishedTourManifest,
-  getCachedPublishedTourManifest
+  getCachedPublishedTourManifestEntry,
+  type CachedPublishedTourManifest
 } from "./manifestCache";
 import { getMobileSupabaseClient } from "./supabase";
 
@@ -16,6 +17,7 @@ export type TourLookupState =
   | { status: "invalid"; code: string; issues: string[] }
   | { status: "error"; message: string }
   | {
+      cachedAt: string | null;
       manifest: PublishedTourManifest;
       reason: "config-missing" | "network-error";
       status: "cached";
@@ -34,8 +36,9 @@ export async function loadPublishedTourManifest(
     if (cachedManifest) {
       return {
         status: "cached",
+        cachedAt: cachedManifest.cachedAt,
         reason: "config-missing",
-        manifest: cachedManifest
+        manifest: cachedManifest.manifest
       };
     }
 
@@ -69,8 +72,9 @@ export async function loadPublishedTourManifest(
     if (cachedManifest) {
       return {
         status: "cached",
+        cachedAt: cachedManifest.cachedAt,
         reason: "network-error",
-        manifest: cachedManifest
+        manifest: cachedManifest.manifest
       };
     }
 
@@ -89,9 +93,9 @@ export function normalizeTourCode(value: string | string[] | undefined): string 
 
 async function getCachedManifestSafely(
   tourCode: string
-): Promise<PublishedTourManifest | null> {
+): Promise<CachedPublishedTourManifest | null> {
   try {
-    return await getCachedPublishedTourManifest(tourCode);
+    return await getCachedPublishedTourManifestEntry(tourCode);
   } catch {
     return null;
   }

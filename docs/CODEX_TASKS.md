@@ -14,7 +14,7 @@ Use this list to keep early work sequenced.
 
 ## Mobile
 
-- Add offline UX polish and retry controls.
+- Add tour resume/deep-link polish for visitors returning to a saved code.
 
 ## Completed Foundation Slices
 
@@ -39,6 +39,7 @@ Use this list to keep early work sequenced.
 - Updated local seed manifests to compute hashes through the database helper.
 - Added local Supabase CLI config, alternate Windows-safe ports, and smoke test.
 - Added automated mobile web smoke coverage for tour lookup, invalid codes, stop detail, and cache clearing.
+- Added mobile offline UX polish, cached manifest metadata, and retry controls.
 
 ## Backend
 

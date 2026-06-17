@@ -70,16 +70,26 @@ async function main() {
 
     await page.navigate(`${MOBILE_WEB_URL}/tour/BADJSON`);
     await waitForText(page, ["Manifest is invalid"]);
-    await assertText(page, ["publishId: Required", "description: Required"]);
+    await assertText(page, [
+      "publishId: Required",
+      "description: Required",
+      "Retry lookup"
+    ]);
     console.log("BADJSON renders invalid-manifest state.");
 
     await page.navigate(`${MOBILE_WEB_URL}/tour/NOPE`);
     await waitForText(page, ["Tour not found", "No published tour exists"]);
+    await assertText(page, ["Retry lookup"]);
     console.log("Unknown code renders not-found state.");
 
     await page.navigate(`${MOBILE_WEB_URL}/`);
     await waitForText(page, ["Old Town Loop", "TOURS"]);
-    await assertText(page, ["Victoria - 3 stops", "OLDTOWN"]);
+    await assertText(page, [
+      "Victoria - 3 stops",
+      "Published",
+      "Hash",
+      "OLDTOWN"
+    ]);
     await clickByText(page, "Clear offline data");
     await waitForText(page, ["Cleared 1 saved tour", "TOURS"]);
     await assertText(page, ["Loaded tours and played audio will appear here."]);

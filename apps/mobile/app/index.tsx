@@ -20,6 +20,10 @@ import {
   listCachedPublishedTourManifests,
   type CachedManifestSummary
 } from "../lib/manifestCache";
+import {
+  formatDisplayTimestamp,
+  formatShortContentHash
+} from "../lib/format";
 import { sampleTourManifest } from "../lib/sampleTour";
 
 type CachePanelState =
@@ -212,6 +216,15 @@ function OfflineCachePanel({
                     <Text style={styles.cachedTourTitle}>{manifest.title}</Text>
                     <Text style={styles.cachedTourMeta}>
                       {manifest.city} - {manifest.stopCount} stops
+                    </Text>
+                    <Text style={styles.cachedTourDetail}>
+                      {`Saved ${formatDisplayTimestamp(
+                        manifest.cachedAt
+                      )} - Published ${formatDisplayTimestamp(
+                        manifest.publishedAt
+                      )} - Hash ${formatShortContentHash(
+                        manifest.contentHash
+                      )}`}
                     </Text>
                   </View>
                   <Text style={styles.cachedTourCode}>{manifest.tourCode}</Text>
@@ -442,6 +455,11 @@ const styles = StyleSheet.create({
   cachedTourMeta: {
     color: "#53615a",
     fontSize: 12
+  },
+  cachedTourDetail: {
+    color: "#6d766f",
+    fontSize: 11,
+    lineHeight: 16
   },
   cachedTourCode: {
     color: "#2d6a4f",

@@ -9,9 +9,16 @@ const CACHE_KEY_PREFIX = "wanderkit:published-tour:";
 export type CachedManifestSummary = {
   cachedAt: string | null;
   city: string;
+  contentHash: string;
+  publishedAt: string;
   stopCount: number;
   title: string;
   tourCode: string;
+};
+
+export type CachedPublishedTourManifest = {
+  cachedAt: string | null;
+  manifest: PublishedTourManifest;
 };
 
 export async function cachePublishedTourManifest(
@@ -29,6 +36,13 @@ export async function cachePublishedTourManifest(
 export async function getCachedPublishedTourManifest(
   tourCode: string
 ): Promise<PublishedTourManifest | null> {
+  const cachedEntry = await getCachedPublishedTourManifestEntry(tourCode);
+  return cachedEntry?.manifest ?? null;
+}
+
+export async function getCachedPublishedTourManifestEntry(
+  tourCode: string
+): Promise<CachedPublishedTourManifest | null> {
   const rawValue = await AsyncStorage.getItem(createManifestCacheKey(tourCode));
 
   if (!rawValue) {
@@ -36,10 +50,7 @@ export async function getCachedPublishedTourManifest(
   }
 
   try {
-    const parsed = JSON.parse(rawValue) as { manifest?: unknown };
-    const manifest = PublishedTourManifestSchema.parse(parsed.manifest);
-
-    return manifest;
+    return parseCachedManifest(rawValue);
   } catch {
     await AsyncStorage.removeItem(createManifestCacheKey(tourCode));
     return null;
@@ -61,15 +72,12 @@ export async function listCachedPublishedTourManifests(): Promise<
     }
 
     try {
-      const parsed = JSON.parse(value) as {
-        cachedAt?: unknown;
-        manifest?: unknown;
-      };
-      const manifest = PublishedTourManifestSchema.parse(parsed.manifest);
+      const { cachedAt, manifest } = parseCachedManifest(value);
       summaries.push({
-        cachedAt:
-          typeof parsed.cachedAt === "string" ? parsed.cachedAt : null,
+        cachedAt,
         city: manifest.city,
+        contentHash: manifest.contentHash,
+        publishedAt: manifest.publishedAt,
         stopCount: manifest.stops.length,
         title: manifest.title,
         tourCode: manifest.tourCode
@@ -101,4 +109,17 @@ export async function clearCachedPublishedTourManifests(): Promise<number> {
 
 function createManifestCacheKey(tourCode: string): string {
   return `${CACHE_KEY_PREFIX}${tourCode.trim().toUpperCase()}`;
+}
+
+function parseCachedManifest(rawValue: string): CachedPublishedTourManifest {
+  const parsed = JSON.parse(rawValue) as {
+    cachedAt?: unknown;
+    manifest?: unknown;
+  };
+  const manifest = PublishedTourManifestSchema.parse(parsed.manifest);
+
+  return {
+    cachedAt: typeof parsed.cachedAt === "string" ? parsed.cachedAt : null,
+    manifest
+  };
 }
