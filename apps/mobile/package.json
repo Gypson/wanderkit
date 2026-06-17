@@ -1,0 +1,35 @@
+{
+  "name": "@wanderkit/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "scripts": {
+    "android": "expo start --android",
+    "dev": "expo start",
+    "ios": "expo start --ios",
+    "start": "expo start",
+    "typecheck": "tsc --noEmit",
+    "web": "expo start --web"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^14.1.0",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "@wanderkit/shared": "workspace:*",
+    "@wanderkit/supabase": "workspace:*",
+    "expo": "~53.0.20",
+    "expo-audio": "~0.4.9",
+    "expo-file-system": "~18.1.11",
+    "expo-router": "~5.1.4",
+    "expo-status-bar": "~2.2.3",
+    "react": "19.0.0",
+    "react-native": "0.79.6",
+    "react-native-maps": "1.20.1",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.11.1",
+    "react-native-url-polyfill": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.0.10",
+    "typescript": "~5.8.3"
+  }
+}

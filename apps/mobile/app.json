@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "WanderKit",
+    "slug": "wanderkit",
+    "scheme": "wanderkit",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      "expo-audio"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#fbfaf7"
+      }
+    }
+  }
+}
