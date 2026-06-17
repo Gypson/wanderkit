@@ -7,10 +7,17 @@
     "build": "pnpm -r --if-present build",
     "dev:mobile": "pnpm --filter @wanderkit/mobile dev",
     "dev:studio": "pnpm --filter @wanderkit/studio dev",
+    "supabase:reset": "supabase db reset",
+    "supabase:smoke": "node scripts/supabase-smoke.mjs",
+    "supabase:start": "supabase start",
+    "supabase:status": "supabase status",
+    "supabase:stop": "supabase stop",
+    "supabase:types": "supabase gen types typescript --local --schema public > packages/supabase/src/database.types.ts",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
+    "supabase": "2.106.0",
     "typescript": "~5.8.3"
   }
 }

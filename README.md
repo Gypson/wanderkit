@@ -40,7 +40,26 @@ Start the Expo app:
 pnpm dev:mobile
 ```
 
-Copy `.env.example` to `.env.local` for Studio and to your Expo environment when connecting to a real Supabase project.
+Copy `.env.example` to `.env.local` for Studio and to your Expo environment when connecting to Supabase.
+
+## Local Supabase
+
+The repo is configured for the Supabase CLI. Local ports use `5542x` because some Windows setups reserve Supabase's default Postgres port range.
+
+```bash
+pnpm supabase:start
+pnpm supabase:reset
+pnpm supabase:smoke
+```
+
+Useful local URLs:
+
+- API: `http://127.0.0.1:55421`
+- Database: `postgresql://postgres:postgres@127.0.0.1:55422/postgres`
+- Supabase Studio: `http://127.0.0.1:55423`
+- Email tester: `http://127.0.0.1:55424`
+
+Run `pnpm supabase:status` to print the local anon and service-role keys for `.env.local`.
 
 ## Supabase Seed Data
 
@@ -59,14 +78,14 @@ The mobile map uses `react-native-maps`. Expo Go works without extra setup for t
 Set these Expo variables before running the mobile app against Supabase:
 
 ```bash
-EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+EXPO_PUBLIC_SUPABASE_URL=http://127.0.0.1:55421
 EXPO_PUBLIC_SUPABASE_ANON_KEY=your-local-anon-key
 ```
 
 Creator Studio can edit drafts locally without Supabase. To save draft rows, upload audio files, and publish manifest rows to Supabase, set:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:55421
 SUPABASE_SERVICE_ROLE_KEY=your-local-service-role-key
 STUDIO_AUDIO_BUCKET=tour-audio
 STUDIO_DEMO_CREATOR_ID=00000000-0000-0000-0000-000000000101
@@ -80,5 +99,10 @@ With those server env vars configured, Studio also loads saved drafts from Supab
 
 - `pnpm dev:studio`: starts the Next.js Creator Studio.
 - `pnpm dev:mobile`: starts Expo.
+- `pnpm supabase:start`: starts the local Supabase Docker stack.
+- `pnpm supabase:reset`: applies migrations and seed data to the local database.
+- `pnpm supabase:smoke`: verifies the seeded manifest lookup and immutability rules.
+- `pnpm supabase:status`: prints local service URLs and keys.
+- `pnpm supabase:stop`: stops the local Supabase stack.
 - `pnpm typecheck`: type-checks every workspace package.
 - `pnpm build`: runs package builds where available.

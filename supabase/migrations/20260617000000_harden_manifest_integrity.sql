@@ -7,7 +7,10 @@ immutable
 set search_path = public
 as $$
   select 'sha256-' || encode(
-    digest(jsonb_strip_nulls(p_manifest - 'contentHash')::text, 'sha256'),
+    extensions.digest(
+      jsonb_strip_nulls(p_manifest - 'contentHash')::text,
+      'sha256'
+    ),
     'hex'
   );
 $$;
@@ -121,6 +124,9 @@ create policy "Creators can read their published manifests"
         and tours.creator_id = auth.uid()
     )
   );
+
+grant select on public.published_tour_manifests
+  to anon, authenticated;
 
 create or replace function public.prevent_published_manifest_mutation()
 returns trigger
