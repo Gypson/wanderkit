@@ -220,6 +220,53 @@ export async function clearAudioCache(): Promise<AudioCacheSummary> {
   return summary;
 }
 
+export async function clearCachedAudioForStops({
+  stops,
+  tourCode
+}: {
+  stops: Array<{ audioUrl: string; id: string }>;
+  tourCode: string;
+}): Promise<AudioCacheSummary> {
+  if (!FileSystem.documentDirectory || stops.length === 0) {
+    return {
+      fileCount: 0,
+      sizeBytes: 0
+    };
+  }
+
+  const directory = await FileSystem.getInfoAsync(AUDIO_CACHE_DIR);
+
+  if (!directory.exists || !directory.isDirectory) {
+    return {
+      fileCount: 0,
+      sizeBytes: 0
+    };
+  }
+
+  let fileCount = 0;
+  let sizeBytes = 0;
+
+  for (const stop of stops) {
+    const localUri = createAudioFileUri({
+      audioUrl: stop.audioUrl,
+      stopId: stop.id,
+      tourCode
+    });
+    const file = await FileSystem.getInfoAsync(localUri);
+
+    if (file.exists && !file.isDirectory) {
+      fileCount += 1;
+      sizeBytes += file.size;
+      await FileSystem.deleteAsync(localUri, { idempotent: true });
+    }
+  }
+
+  return {
+    fileCount,
+    sizeBytes
+  };
+}
+
 async function ensureAudioCacheDirectory(): Promise<void> {
   const directory = await FileSystem.getInfoAsync(AUDIO_CACHE_DIR);
 

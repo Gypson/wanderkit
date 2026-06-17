@@ -55,7 +55,8 @@ async function main() {
       "Route preview",
       "AUDIO DOWNLOADS",
       "0 of 3 stops saved",
-      "Download all unavailable"
+      "Download all unavailable",
+      "Clear saved audio"
     ]);
     await assertText(page, [
       "0 of 3 stops played",

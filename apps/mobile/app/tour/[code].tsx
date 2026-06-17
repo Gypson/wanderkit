@@ -17,6 +17,7 @@ import type { PublishedStop, PublishedTourManifest } from "@wanderkit/shared";
 import { StatePanel } from "../../components/StatePanel";
 import { TourMap } from "../../components/TourMap";
 import {
+  clearCachedAudioForStops,
   downloadAudioForStop,
   getCachedAudioStatuses,
   type AudioCacheStatus,
@@ -158,7 +159,7 @@ function PublishedTourView({
   const [tourAudioDownload, setTourAudioDownload] = useState<{
     message: string | null;
     processedCount: number;
-    status: "idle" | "running";
+    status: "clearing" | "idle" | "running";
   }>({
     message: null,
     processedCount: 0,
@@ -215,13 +216,13 @@ function PublishedTourView({
             setProgress(nextProgress);
             setAudioStatuses(nextAudioStatuses);
             setTourAudioDownload((currentDownload) =>
-              currentDownload.status === "running"
-                ? currentDownload
-                : {
+              currentDownload.status === "idle"
+                ? {
                     message: null,
                     processedCount: 0,
                     status: "idle"
                   }
+                : currentDownload
             );
           }
         })
@@ -355,6 +356,42 @@ function PublishedTourView({
     }
   };
 
+  const clearTourAudio = async () => {
+    setAudioDownloadMessage(null);
+    setTourAudioDownload({
+      message: null,
+      processedCount: 0,
+      status: "clearing"
+    });
+
+    try {
+      const summary = await clearCachedAudioForStops({
+        stops: manifest.stops,
+        tourCode: manifest.tourCode
+      });
+      const nextAudioStatuses = await getCachedAudioStatuses({
+        stops: manifest.stops,
+        tourCode: manifest.tourCode
+      });
+
+      setAudioStatuses(nextAudioStatuses);
+      setTourAudioDownload({
+        message: formatClearAudioMessage(summary.fileCount),
+        processedCount: 0,
+        status: "idle"
+      });
+    } catch (error) {
+      setTourAudioDownload({
+        message:
+          error instanceof Error
+            ? error.message
+            : "Saved audio could not be cleared.",
+        processedCount: 0,
+        status: "idle"
+      });
+    }
+  };
+
   return (
     <>
       <View style={styles.header}>
@@ -387,9 +424,22 @@ function PublishedTourView({
 
       <TourAudioDownloadPanel
         isAllSaved={isAllAudioSaved}
+        isClearing={tourAudioDownload.status === "clearing"}
         isRunning={tourAudioDownload.status === "running"}
         isUnavailable={isAudioDownloadUnavailable}
         message={tourAudioDownload.message}
+        onClearAudio={() => {
+          clearTourAudio().catch((error) => {
+            setTourAudioDownload({
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "Saved audio could not be cleared.",
+              processedCount: 0,
+              status: "idle"
+            });
+          });
+        }}
         onDownloadAll={() => {
           downloadAllAudio().catch((error) => {
             setTourAudioDownload({
@@ -491,18 +541,22 @@ function PublishedTourView({
 
 function TourAudioDownloadPanel({
   isAllSaved,
+  isClearing,
   isRunning,
   isUnavailable,
   message,
+  onClearAudio,
   onDownloadAll,
   processedCount,
   savedCount,
   stopCount
 }: {
   isAllSaved: boolean;
+  isClearing: boolean;
   isRunning: boolean;
   isUnavailable: boolean;
   message: string | null;
+  onClearAudio: () => void;
   onDownloadAll: () => void;
   processedCount: number;
   savedCount: number;
@@ -528,12 +582,21 @@ function TourAudioDownloadPanel({
             : "Save stop audio on this device for offline replay."}
         </Text>
       </View>
-      <ActionButton
-        disabled={action.disabled}
-        iconName={action.iconName}
-        label={action.label}
-        onPress={onDownloadAll}
-      />
+      <View style={styles.downloadActions}>
+        <ActionButton
+          disabled={action.disabled || isClearing}
+          iconName={action.iconName}
+          label={action.label}
+          onPress={onDownloadAll}
+        />
+        <ActionButton
+          disabled={savedCount === 0 || isClearing || isRunning}
+          iconName="trash"
+          label={isClearing ? "Clearing..." : "Clear saved audio"}
+          onPress={onClearAudio}
+          variant="danger"
+        />
+      </View>
       {message ? <Text style={styles.downloadMessage}>{message}</Text> : null}
     </View>
   );
@@ -800,6 +863,14 @@ function formatDownloadAllMessage({
   return `Saved ${savedCount} stop${savedCount === 1 ? "" : "s"}; ${unavailableCount} unavailable.`;
 }
 
+function formatClearAudioMessage(fileCount: number): string {
+  if (fileCount === 0) {
+    return "No saved audio was found for this tour.";
+  }
+
+  return `Cleared ${fileCount} saved audio file${fileCount === 1 ? "" : "s"}.`;
+}
+
 function formatDuration(seconds: number | undefined): string {
   if (!seconds) {
     return "Audio";
@@ -929,6 +1000,12 @@ const styles = StyleSheet.create({
     color: "#53615a",
     fontSize: 13,
     lineHeight: 19
+  },
+  downloadActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10
   },
   downloadMessage: {
     color: "#53615a",
