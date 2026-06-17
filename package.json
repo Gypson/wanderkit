@@ -5,8 +5,8 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "build": "pnpm -r --if-present build",
-    "dev:mobile": "pnpm --filter @wanderkit/mobile dev",
-    "dev:studio": "pnpm --filter @wanderkit/studio dev",
+    "dev:mobile": "dotenv -c -- pnpm --filter @wanderkit/mobile dev",
+    "dev:studio": "dotenv -c -- pnpm --filter @wanderkit/studio dev",
     "supabase:reset": "supabase db reset",
     "supabase:smoke": "node scripts/supabase-smoke.mjs",
     "supabase:start": "supabase start",
@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.30",
+    "dotenv-cli": "^11.0.0",
     "supabase": "2.106.0",
     "typescript": "~5.8.3"
   }

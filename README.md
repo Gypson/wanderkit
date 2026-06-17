@@ -40,7 +40,7 @@ Start the Expo app:
 pnpm dev:mobile
 ```
 
-Copy `.env.example` to `.env.local` for Studio and to your Expo environment when connecting to Supabase.
+Copy `.env.example` to `.env.local` when connecting to Supabase. The root `dev:studio` and `dev:mobile` scripts load the root `.env.local` before starting the app workspace.
 
 ## Local Supabase
 
