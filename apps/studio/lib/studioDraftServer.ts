@@ -1,8 +1,10 @@
 import {
   buildPublishedTourManifestFromDraft,
   CoordinateSchema,
+  PublishedTourManifestSchema,
   StudioDraftTourSchema,
   type Coordinate,
+  type PublishedTourManifest,
   type StudioDraftStop,
   type StudioDraftTour
 } from "@wanderkit/shared";
@@ -40,12 +42,12 @@ export type StudioPersistenceResult =
 
 export type StudioPublishResult =
   | {
-      manifest: ReturnType<typeof buildPublishedTourManifestFromDraft>;
+      manifest: PublishedTourManifest;
       message: string;
       status: "validated";
     }
   | {
-      manifest: ReturnType<typeof buildPublishedTourManifestFromDraft>;
+      manifest: PublishedTourManifest;
       message: string;
       publishVersion: number;
       status: "published";
@@ -420,7 +422,8 @@ export async function publishStudioDraft(
   draft: StudioDraftTour
 ): Promise<StudioPublishResult> {
   const manifestWithoutHash = buildPublishedTourManifestFromDraft(draft, {
-    contentHash: "sha256-pending",
+    contentHash:
+      "sha256-0000000000000000000000000000000000000000000000000000000000000000",
     publishedAt: new Date().toISOString(),
     publishId: randomUUID()
   });
@@ -462,15 +465,13 @@ export async function publishStudioDraft(
     throw new Error(error.message);
   }
 
-  if (typeof publishVersion !== "number") {
-    throw new Error("Publish did not return a version.");
-  }
+  const published = parsePublishTourManifestRpcResult(publishVersion);
 
   return {
     status: "published",
-    message: `Published ${manifest.tourCode} to Supabase.`,
-    manifest,
-    publishVersion
+    message: `Published ${published.manifest.tourCode} to Supabase.`,
+    manifest: published.manifest,
+    publishVersion: published.publishVersion
   };
 }
 
@@ -555,6 +556,41 @@ function createManifestHash(value: unknown): string {
 
 function toJson(value: unknown): Json {
   return JSON.parse(JSON.stringify(value)) as Json;
+}
+
+function parsePublishTourManifestRpcResult(value: Json | null): {
+  contentHash: string;
+  manifest: PublishedTourManifest;
+  publishVersion: number;
+} {
+  if (!isRecord(value)) {
+    throw new Error("Publish did not return a manifest result.");
+  }
+
+  const publishVersion = value.publishVersion;
+  if (typeof publishVersion !== "number") {
+    throw new Error("Publish did not return a version.");
+  }
+
+  const contentHash = value.contentHash;
+  if (typeof contentHash !== "string") {
+    throw new Error("Publish did not return a content hash.");
+  }
+
+  const manifest = PublishedTourManifestSchema.parse(value.manifest);
+  if (manifest.contentHash !== contentHash) {
+    throw new Error("Published manifest hash does not match RPC result.");
+  }
+
+  return {
+    contentHash,
+    manifest,
+    publishVersion
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function parseJsonCoordinate(value: Json): Coordinate {

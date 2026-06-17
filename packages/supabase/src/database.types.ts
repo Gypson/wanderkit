@@ -230,7 +230,7 @@ export type Database = {
           p_tour_code: string;
           p_tour_id: string;
         };
-        Returns: number;
+        Returns: Json;
       };
     };
     Enums: Record<string, never>;

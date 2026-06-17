@@ -17,6 +17,12 @@ export const AudioMimeTypeSchema = z
   .string()
   .regex(/^audio\/[a-z0-9.+-]+$/i);
 
+export const ContentHashSchema = z
+  .string()
+  .regex(/^sha256-[0-9a-f]{64}$/);
+
+export type ContentHash = z.infer<typeof ContentHashSchema>;
+
 export const AudioAssetMetadataSchema = z.object({
   audioStoragePath: z.string().min(1).optional(),
   audioFileName: z.string().min(1).max(200).optional(),
@@ -94,7 +100,7 @@ export const PublishedTourManifestSchema = z.object({
   route: z.array(CoordinateSchema).min(2),
   stops: z.array(PublishedStopSchema).min(1),
   publishedAt: IsoDateTimeSchema,
-  contentHash: z.string().min(1)
+  contentHash: ContentHashSchema
 });
 
 export type PublishedTourManifest = z.infer<typeof PublishedTourManifestSchema>;

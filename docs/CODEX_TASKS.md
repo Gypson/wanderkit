@@ -7,6 +7,7 @@ Use this list to keep early work sequenced.
 - Keep `pnpm install` and `pnpm typecheck` green.
 - Expand shared schemas before app-specific copies appear.
 - Add generated Supabase database types after the first live project is linked.
+- Add a local Supabase migration/seed smoke test once the CLI is wired in.
 
 ## Creator Studio
 
@@ -34,9 +35,10 @@ Use this list to keep early work sequenced.
 - Added server-side Supabase Storage upload flow for stop audio.
 - Added browser-side audio duration extraction during Studio upload.
 - Added atomic publish RPC for manifest version insertion and tour publish status.
+- Added database-computed manifest content hashing and fetch-time hash checks.
+- Hardened published manifest RLS, database constraints, and immutability trigger.
+- Updated local seed manifests to compute hashes through the database helper.
 
 ## Backend
 
-- Harden RLS policies.
-- Add manifest content hashing.
-- Add seed data for local development.
+- Add an authenticated creator session model to replace the demo creator id.

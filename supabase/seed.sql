@@ -200,21 +200,8 @@ on conflict (tour_id, stop_number) do update set
   audio_duration_seconds = excluded.audio_duration_seconds,
   updated_at = excluded.updated_at;
 
-insert into public.published_tour_manifests (
-  id,
-  tour_id,
-  publish_version,
-  tour_code,
-  manifest,
-  content_hash,
-  published_at
-)
-values (
-  '00000000-0000-0000-0000-000000000501',
-  '00000000-0000-0000-0000-000000000201',
-  1,
-  'OLDTOWN',
-  $manifest$
+with source_manifest as (
+  select $manifest$
   {
     "schemaVersion": 1,
     "tourId": "00000000-0000-0000-0000-000000000201",
@@ -278,18 +265,19 @@ values (
       }
     ],
     "publishedAt": "2026-06-16T18:00:00.000Z",
-    "contentHash": "sha256-demo-oldtown-audio-v3"
+    "contentHash": "sha256-0000000000000000000000000000000000000000000000000000000000000000"
   }
-  $manifest$::jsonb,
-  'sha256-demo-oldtown-audio-v3',
-  '2026-06-16T18:00:00.000Z'
+  $manifest$::jsonb as manifest
+),
+hashed_manifest as (
+  select jsonb_set(
+    manifest,
+    '{contentHash}',
+    to_jsonb(public.compute_manifest_content_hash(manifest)),
+    true
+  ) as manifest
+  from source_manifest
 )
-on conflict (tour_id, publish_version) do update set
-  tour_code = excluded.tour_code,
-  manifest = excluded.manifest,
-  content_hash = excluded.content_hash,
-  published_at = excluded.published_at;
-
 insert into public.published_tour_manifests (
   id,
   tour_id,
@@ -299,17 +287,51 @@ insert into public.published_tour_manifests (
   content_hash,
   published_at
 )
-values (
-  '00000000-0000-0000-0000-000000000502',
-  '00000000-0000-0000-0000-000000000201',
+select
+  '00000000-0000-0000-0000-000000000501'::uuid,
+  '00000000-0000-0000-0000-000000000201'::uuid,
+  1,
+  'OLDTOWN',
+  manifest,
+  manifest->>'contentHash',
+  '2026-06-16T18:00:00.000Z'::timestamptz
+from hashed_manifest
+on conflict (tour_id, publish_version) do nothing;
+
+with source_manifest as (
+  select '{
+    "schemaVersion": 1,
+    "tourId": "00000000-0000-0000-0000-000000000201",
+    "tourCode": "BADJSON",
+    "title": "Broken Manifest",
+    "contentHash": "sha256-0000000000000000000000000000000000000000000000000000000000000000"
+  }'::jsonb as manifest
+),
+hashed_manifest as (
+  select jsonb_set(
+    manifest,
+    '{contentHash}',
+    to_jsonb(public.compute_manifest_content_hash(manifest)),
+    true
+  ) as manifest
+  from source_manifest
+)
+insert into public.published_tour_manifests (
+  id,
+  tour_id,
+  publish_version,
+  tour_code,
+  manifest,
+  content_hash,
+  published_at
+)
+select
+  '00000000-0000-0000-0000-000000000502'::uuid,
+  '00000000-0000-0000-0000-000000000201'::uuid,
   2,
   'BADJSON',
-  '{"schemaVersion": 1, "tourCode": "BADJSON", "title": "Broken Manifest"}'::jsonb,
-  'sha256-invalid-demo',
-  '2026-06-16T18:05:00.000Z'
-)
-on conflict (tour_id, publish_version) do update set
-  tour_code = excluded.tour_code,
-  manifest = excluded.manifest,
-  content_hash = excluded.content_hash,
-  published_at = excluded.published_at;
+  manifest,
+  manifest->>'contentHash',
+  '2026-06-16T18:05:00.000Z'::timestamptz
+from hashed_manifest
+on conflict (tour_id, publish_version) do nothing;

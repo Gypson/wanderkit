@@ -49,11 +49,11 @@ The initial schema stores:
 - `tour-audio` Storage bucket
 - published manifests
 
-Published manifests are readable by anonymous clients so the mobile app can fetch by tour code. Multiple immutable manifest versions can share the same tour code; mobile selects the highest `publish_version` for that code. Draft data should remain creator-owned.
+Published manifests for published tours are readable by anonymous clients so the mobile app can fetch by tour code. Multiple immutable manifest versions can share the same tour code; mobile selects the highest `publish_version` for that code. Draft data should remain creator-owned.
 
 ## Mobile Lookup States
 
-The mobile tour route loads the latest `published_tour_manifests` row by `tour_code`, validates the returned JSON with `PublishedTourManifestSchema`, and renders distinct states for:
+The mobile tour route loads the latest `published_tour_manifests` row by `tour_code`, validates the returned JSON with `PublishedTourManifestSchema`, checks that the JSON `contentHash` matches the stored `content_hash`, and renders distinct states for:
 
 - loading
 - missing Supabase configuration
@@ -95,7 +95,9 @@ The Studio API routes use the Supabase service-role key on the server only:
 - `POST /api/studio/drafts` saves tour, route, and stop draft rows.
 - `POST /api/studio/publish` validates the manifest, saves current draft rows, then calls the `publish_tour_manifest` RPC.
 
-The `publish_tour_manifest` RPC locks the tour row, computes the next `publish_version`, marks the tour as published, and inserts the frozen manifest in one database transaction. This avoids a tour being marked published without a corresponding immutable manifest row.
+The `publish_tour_manifest` RPC locks the tour row, computes the next `publish_version`, computes the canonical manifest content hash in Postgres, writes that hash into both the manifest JSON and the `content_hash` column, marks the tour as published, and inserts the frozen manifest in one database transaction. This avoids a tour being marked published without a corresponding immutable manifest row.
+
+Published manifest rows have database constraints that keep `tour_id`, `tour_code`, and `content_hash` aligned with the JSON payload. A trigger blocks updates and deletes after insert, except no-op updates for operational idempotence. Public RLS reads go through a security-definer helper that only exposes manifests whose parent tour is published.
 
 When service-role env vars are missing, the read routes return an empty local-only state and the mutation routes return local-only success messages after validation so the editor remains usable during early development.
 

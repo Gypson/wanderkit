@@ -1313,7 +1313,8 @@ function buildPreviewManifest(draft: StudioDraftTour | null): {
       manifest: buildPublishedTourManifestFromDraft(draft, {
         publishId: "preview",
         publishedAt: new Date(0).toISOString(),
-        contentHash: "sha256-preview"
+        contentHash:
+          "sha256-0000000000000000000000000000000000000000000000000000000000000000"
       })
     };
   } catch (error) {

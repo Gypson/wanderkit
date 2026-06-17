@@ -1,4 +1,5 @@
 import {
+  ContentHashSchema,
   PublishedTourManifestSchema,
   type PublishedTourManifest
 } from "@wanderkit/shared";
@@ -122,7 +123,7 @@ export async function fetchPublishedTourManifestByCode(
 ): Promise<PublishedTourManifest | null> {
   const { data, error } = await client
     .from("published_tour_manifests")
-    .select("manifest")
+    .select("manifest,content_hash")
     .eq("tour_code", tourCode)
     .order("publish_version", { ascending: false })
     .limit(1);
@@ -131,9 +132,17 @@ export async function fetchPublishedTourManifestByCode(
     throw error;
   }
 
-  const row = (data as { manifest: unknown }[])[0] ?? null;
+  const row =
+    (data as { content_hash: string; manifest: unknown }[])[0] ?? null;
   if (!row) {
     return null;
+  }
+
+  const storedHash = ContentHashSchema.safeParse(row.content_hash);
+  if (!storedHash.success) {
+    throw new InvalidPublishedTourManifestError(tourCode, [
+      "content_hash: Stored manifest hash is not a valid SHA-256 hash."
+    ]);
   }
 
   const parsed = PublishedTourManifestSchema.safeParse(row.manifest);
@@ -145,6 +154,12 @@ export async function fetchPublishedTourManifestByCode(
         return path ? `${path}: ${issue.message}` : issue.message;
       })
     );
+  }
+
+  if (parsed.data.contentHash !== storedHash.data) {
+    throw new InvalidPublishedTourManifestError(tourCode, [
+      "contentHash: Manifest hash does not match the stored content_hash."
+    ]);
   }
 
   return parsed.data;

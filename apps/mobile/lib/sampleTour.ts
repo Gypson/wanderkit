@@ -54,5 +54,6 @@ export const sampleTourManifest = PublishedTourManifestSchema.parse({
     }
   ],
   publishedAt: "2026-06-16T18:00:00.000Z",
-  contentHash: "sha256-demo-oldtown-audio-v2"
+  contentHash:
+    "sha256-0000000000000000000000000000000000000000000000000000000000000000"
 });
