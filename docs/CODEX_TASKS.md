@@ -38,6 +38,7 @@ Use this list to keep early work sequenced.
 - Hardened published manifest RLS, database constraints, and immutability trigger.
 - Updated local seed manifests to compute hashes through the database helper.
 - Added local Supabase CLI config, alternate Windows-safe ports, and smoke test.
+- Added automated mobile web smoke coverage for tour lookup, invalid codes, stop detail, and cache clearing.
 
 ## Backend
 
