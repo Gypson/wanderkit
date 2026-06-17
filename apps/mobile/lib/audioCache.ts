@@ -20,6 +20,10 @@ export type AudioCacheSummary = {
   sizeBytes: number;
 };
 
+export type AudioCacheStatus = "downloaded" | "not-downloaded" | "unavailable";
+
+export type AudioCacheStatusByStopId = Record<string, AudioCacheStatus>;
+
 const AUDIO_CACHE_DIR = `${FileSystem.documentDirectory ?? ""}wanderkit-audio/`;
 
 export async function getCachedAudioUri({
@@ -115,6 +119,53 @@ export async function getAudioCacheSummary(): Promise<AudioCacheSummary> {
     fileCount,
     sizeBytes
   };
+}
+
+export async function getCachedAudioStatus({
+  audioUrl,
+  stopId,
+  tourCode
+}: {
+  audioUrl: string;
+  stopId: string;
+  tourCode: string;
+}): Promise<AudioCacheStatus> {
+  if (!FileSystem.documentDirectory) {
+    return "unavailable";
+  }
+
+  const localUri = createAudioFileUri({ audioUrl, stopId, tourCode });
+  const cachedFile = await FileSystem.getInfoAsync(localUri);
+
+  return cachedFile.exists && !cachedFile.isDirectory
+    ? "downloaded"
+    : "not-downloaded";
+}
+
+export async function getCachedAudioStatuses({
+  stops,
+  tourCode
+}: {
+  stops: Array<{ audioUrl: string; id: string }>;
+  tourCode: string;
+}): Promise<AudioCacheStatusByStopId> {
+  const entries = await Promise.all(
+    stops.map(async (stop) => {
+      try {
+        const status = await getCachedAudioStatus({
+          audioUrl: stop.audioUrl,
+          stopId: stop.id,
+          tourCode
+        });
+
+        return [stop.id, status] as const;
+      } catch {
+        return [stop.id, "unavailable"] as const;
+      }
+    })
+  );
+
+  return Object.fromEntries(entries);
 }
 
 export async function clearAudioCache(): Promise<AudioCacheSummary> {

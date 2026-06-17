@@ -53,6 +53,7 @@ async function main() {
     await waitForText(page, ["Old Town Loop", "Route preview"]);
     await assertText(page, [
       "0 of 3 stops played",
+      "Streaming only",
       "3 route points - 3 stops",
       "Market Square",
       "Johnson Street",
@@ -100,6 +101,7 @@ async function main() {
       "Old Town Loop",
       "Route preview",
       "1 of 3 stops played",
+      "Streaming only",
       "Played"
     ]);
     console.log("Bad stop deep links offer a route fallback.");

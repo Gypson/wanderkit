@@ -16,6 +16,11 @@ import { RetryButton } from "../../components/RetryButton";
 import type { PublishedStop, PublishedTourManifest } from "@wanderkit/shared";
 import { StatePanel } from "../../components/StatePanel";
 import { TourMap } from "../../components/TourMap";
+import {
+  getCachedAudioStatuses,
+  type AudioCacheStatus,
+  type AudioCacheStatusByStopId
+} from "../../lib/audioCache";
 import { formatDisplayTimestamp } from "../../lib/format";
 import {
   clearTourProgressState,
@@ -140,6 +145,9 @@ function PublishedTourView({
   const [progress, setProgress] = useState<TourProgressState>(() =>
     createEmptyTourProgress(manifest.tourCode)
   );
+  const [audioStatuses, setAudioStatuses] = useState<AudioCacheStatusByStopId>(
+    {}
+  );
   const [isResettingProgress, setIsResettingProgress] = useState(false);
   const selectedStop = useMemo(
     () =>
@@ -167,22 +175,30 @@ function PublishedTourView({
     useCallback(() => {
       let isMounted = true;
 
-      getTourProgressState(manifest.tourCode)
-        .then((nextProgress) => {
+      Promise.all([
+        getTourProgressState(manifest.tourCode),
+        getCachedAudioStatuses({
+          stops: manifest.stops,
+          tourCode: manifest.tourCode
+        })
+      ])
+        .then(([nextProgress, nextAudioStatuses]) => {
           if (isMounted) {
             setProgress(nextProgress);
+            setAudioStatuses(nextAudioStatuses);
           }
         })
         .catch(() => {
           if (isMounted) {
             setProgress(createEmptyTourProgress(manifest.tourCode));
+            setAudioStatuses({});
           }
         });
 
       return () => {
         isMounted = false;
       };
-    }, [manifest.tourCode])
+    }, [manifest.stops, manifest.tourCode])
   );
 
   const openStop = (stop: PublishedStop) => {
@@ -243,6 +259,7 @@ function PublishedTourView({
 
       {selectedStop ? (
         <SelectedStopPanel
+          audioStatus={audioStatuses[selectedStop.id] ?? "unavailable"}
           isPlayed={isStopPlayed(progress, selectedStop.id)}
           stop={selectedStop}
         />
@@ -251,6 +268,7 @@ function PublishedTourView({
       <View style={styles.stopList}>
         {manifest.stops.map((stop) => {
           const stopPlayed = playedStopIdSet.has(stop.id);
+          const audioStatus = audioStatuses[stop.id] ?? "unavailable";
 
           return (
             <Pressable
@@ -275,16 +293,16 @@ function PublishedTourView({
                 )}
               </View>
               <View style={styles.stopText}>
-                <View style={styles.stopTitleRow}>
-                  <Text style={styles.stopTitle}>{stop.title}</Text>
-                  <Text
-                    style={[
-                      styles.stopProgressText,
-                      stopPlayed ? styles.stopProgressTextPlayed : null
-                    ]}
-                  >
-                    {stopPlayed ? "Played" : "Not played"}
-                  </Text>
+                <Text style={styles.stopTitle}>{stop.title}</Text>
+                <View style={styles.stopStatusRow}>
+                  <StopStatusPill
+                    label={stopPlayed ? "Played" : "Not played"}
+                    tone={stopPlayed ? "success" : "neutral"}
+                  />
+                  <StopStatusPill
+                    label={formatAudioStatusLabel(audioStatus)}
+                    tone={audioStatus === "downloaded" ? "success" : "neutral"}
+                  />
                 </View>
                 <Text style={styles.stopSummary}>{stop.summary}</Text>
               </View>
@@ -361,9 +379,11 @@ function TourProgressPanel({
 }
 
 function SelectedStopPanel({
+  audioStatus,
   isPlayed,
   stop
 }: {
+  audioStatus: AudioCacheStatus;
   isPlayed: boolean;
   stop: PublishedStop;
 }) {
@@ -375,6 +395,9 @@ function SelectedStopPanel({
           <Text style={styles.selectedPlayed}>
             {isPlayed ? "Played" : "Not played"}
           </Text>
+          <Text style={styles.selectedAudioStatus}>
+            {formatAudioStatusLabel(audioStatus)}
+          </Text>
           <Text style={styles.selectedDuration}>
             {formatDuration(stop.audioDurationSeconds)}
           </Text>
@@ -384,6 +407,44 @@ function SelectedStopPanel({
       <Text style={styles.selectedSummary}>{stop.summary}</Text>
     </View>
   );
+}
+
+function StopStatusPill({
+  label,
+  tone
+}: {
+  label: string;
+  tone: "neutral" | "success";
+}) {
+  return (
+    <View
+      style={[
+        styles.stopStatusPill,
+        tone === "success" ? styles.stopStatusPillSuccess : null
+      ]}
+    >
+      <Text
+        style={[
+          styles.stopStatusText,
+          tone === "success" ? styles.stopStatusTextSuccess : null
+        ]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function formatAudioStatusLabel(status: AudioCacheStatus): string {
+  if (status === "downloaded") {
+    return "Audio saved";
+  }
+
+  if (status === "not-downloaded") {
+    return "Not saved";
+  }
+
+  return "Streaming only";
 }
 
 function formatDuration(seconds: number | undefined): string {
@@ -520,6 +581,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800"
   },
+  selectedAudioStatus: {
+    color: "#dbe7df",
+    fontSize: 12,
+    fontWeight: "800"
+  },
   selectedTitle: {
     color: "#ffffff",
     fontSize: 21,
@@ -574,24 +640,33 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 3
   },
-  stopTitleRow: {
+  stopStatusRow: {
     alignItems: "center",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8
+    gap: 6
   },
   stopTitle: {
     color: "#16202a",
     fontSize: 16,
     fontWeight: "800"
   },
-  stopProgressText: {
+  stopStatusPill: {
+    backgroundColor: "#f1f3f0",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4
+  },
+  stopStatusPillSuccess: {
+    backgroundColor: "#eaf4f4"
+  },
+  stopStatusText: {
     color: "#6d766f",
     fontSize: 11,
     fontWeight: "800",
     textTransform: "uppercase"
   },
-  stopProgressTextPlayed: {
+  stopStatusTextSuccess: {
     color: "#2d6a4f"
   },
   stopSummary: {

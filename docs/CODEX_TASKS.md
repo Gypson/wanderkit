@@ -14,7 +14,7 @@ Use this list to keep early work sequenced.
 
 ## Mobile
 
-- Add per-stop audio download status on the route screen.
+- Add manual audio pre-download controls for stops.
 
 ## Completed Foundation Slices
 
@@ -43,6 +43,7 @@ Use this list to keep early work sequenced.
 - Added mobile tour resume, cached-tour reopening, and stop deep-link fallback polish.
 - Added played-stop progress markers and local tour completion state.
 - Added per-tour progress reset controls for visitors.
+- Added per-stop audio download status on the route screen.
 
 ## Backend
 
