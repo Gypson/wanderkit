@@ -21,6 +21,14 @@ import { CachedManifestNotice } from "../../../../components/CachedManifestNotic
 import { RetryButton } from "../../../../components/RetryButton";
 import { StatePanel } from "../../../../components/StatePanel";
 import { getCachedAudioUri, type CachedAudioResult } from "../../../../lib/audioCache";
+import {
+  createEmptyTourProgress,
+  getProgressSummary,
+  getTourProgressState,
+  isStopPlayed,
+  markTourStopPlayed,
+  type TourProgressState
+} from "../../../../lib/tourProgress";
 import type { TourLookupState } from "../../../../lib/tourLookup";
 import { useTourLookup } from "../../../../lib/useTourLookup";
 import { saveVisitorResumeStop } from "../../../../lib/visitorResume";
@@ -175,11 +183,50 @@ function PlayableStop({
   manifest: PublishedTourManifest;
   stop: PublishedStop;
 }) {
+  const [progress, setProgress] = useState<TourProgressState>(() =>
+    createEmptyTourProgress(manifest.tourCode)
+  );
+  const playedCount = manifest.stops.filter((manifestStop) =>
+    isStopPlayed(progress, manifestStop.id)
+  ).length;
+  const isCurrentStopPlayed = isStopPlayed(progress, stop.id);
+  const isTourComplete =
+    manifest.stops.length > 0 && playedCount === manifest.stops.length;
+
   useEffect(() => {
     saveVisitorResumeStop({ manifest, stop }).catch(() => {
       // Resume state should not block playing a valid stop.
     });
   }, [manifest, stop]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getTourProgressState(manifest.tourCode)
+      .then((nextProgress) => {
+        if (isMounted) {
+          setProgress(nextProgress);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setProgress(createEmptyTourProgress(manifest.tourCode));
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [manifest.tourCode]);
+
+  const markCurrentStopPlayed = async () => {
+    const nextProgress = await markTourStopPlayed({
+      stopId: stop.id,
+      stopIds: manifest.stops.map((manifestStop) => manifestStop.id),
+      tourCode: manifest.tourCode
+    });
+    setProgress(nextProgress);
+  };
 
   return (
     <>
@@ -214,7 +261,22 @@ function PlayableStop({
         </View>
       </View>
 
-      <AudioControls stop={stop} tourCode={manifest.tourCode} />
+      <StopProgressCard
+        isComplete={isTourComplete}
+        isPlayed={isCurrentStopPlayed}
+        playedCount={playedCount}
+        stopCount={manifest.stops.length}
+      />
+
+      <AudioControls
+        onMarkPlayed={() => {
+          markCurrentStopPlayed().catch(() => {
+            // Local progress writes should not block audio playback.
+          });
+        }}
+        stop={stop}
+        tourCode={manifest.tourCode}
+      />
 
       <View style={styles.notesPanel}>
         <Text style={styles.notesTitle}>About this stop</Text>
@@ -228,9 +290,11 @@ function PlayableStop({
 }
 
 function AudioControls({
+  onMarkPlayed,
   stop,
   tourCode
 }: {
+  onMarkPlayed: () => void;
   stop: PublishedStop;
   tourCode: string;
 }) {
@@ -312,6 +376,7 @@ function AudioControls({
       }
 
       player.play();
+      onMarkPlayed();
     } catch (error) {
       setAudioError(
         error instanceof Error ? error.message : "Audio could not be played."
@@ -393,6 +458,43 @@ function AudioControls({
       ) : null}
       <Text style={styles.audioHint}>{formatAudioSource(audioSource)}</Text>
       {audioError ? <Text style={styles.audioError}>{audioError}</Text> : null}
+    </View>
+  );
+}
+
+function StopProgressCard({
+  isComplete,
+  isPlayed,
+  playedCount,
+  stopCount
+}: {
+  isComplete: boolean;
+  isPlayed: boolean;
+  playedCount: number;
+  stopCount: number;
+}) {
+  return (
+    <View style={styles.stopProgressCard}>
+      <View
+        style={[
+          styles.stopProgressIcon,
+          isPlayed ? styles.stopProgressIconPlayed : null
+        ]}
+      >
+        <Ionicons
+          color={isPlayed ? "#ffffff" : "#2d6a4f"}
+          name={isPlayed ? "checkmark" : "play"}
+          size={16}
+        />
+      </View>
+      <View style={styles.stopProgressCopy}>
+        <Text style={styles.stopProgressTitle}>
+          {isComplete ? "Tour complete" : isPlayed ? "Stop played" : "Not played yet"}
+        </Text>
+        <Text style={styles.stopProgressBody}>
+          {getProgressSummary({ playedCount, stopCount })}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -488,6 +590,42 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 22,
     padding: 16
+  },
+  stopProgressCard: {
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderColor: "#d5ded8",
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 18,
+    padding: 14
+  },
+  stopProgressIcon: {
+    alignItems: "center",
+    backgroundColor: "#eaf4f4",
+    borderRadius: 18,
+    height: 36,
+    justifyContent: "center",
+    width: 36
+  },
+  stopProgressIconPlayed: {
+    backgroundColor: "#2d6a4f"
+  },
+  stopProgressCopy: {
+    flex: 1,
+    gap: 2
+  },
+  stopProgressTitle: {
+    color: "#16202a",
+    fontSize: 15,
+    fontWeight: "800"
+  },
+  stopProgressBody: {
+    color: "#53615a",
+    fontSize: 13,
+    lineHeight: 19
   },
   metaLabel: {
     color: "#53615a",

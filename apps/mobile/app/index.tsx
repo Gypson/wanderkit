@@ -27,6 +27,11 @@ import {
 } from "../lib/format";
 import { sampleTourManifest } from "../lib/sampleTour";
 import {
+  clearTourProgressStates,
+  listTourProgressStates,
+  type TourProgressState
+} from "../lib/tourProgress";
+import {
   clearVisitorResumeState,
   getVisitorResumeState,
   type VisitorResumeState
@@ -38,6 +43,7 @@ type CachePanelState =
       audio: AudioCacheSummary;
       manifests: CachedManifestSummary[];
       message: string | null;
+      progressByTourCode: Record<string, TourProgressState>;
       status: "ready";
     }
   | { message: string; status: "error" };
@@ -81,10 +87,11 @@ export default function CodeEntryScreen() {
       setCacheState({ status: "loading" });
 
       try {
-        const [manifests, audio, resume] = await Promise.all([
+        const [manifests, audio, resume, progressStates] = await Promise.all([
           listCachedPublishedTourManifests(),
           getAudioCacheSummary(),
-          getVisitorResumeState()
+          getVisitorResumeState(),
+          listTourProgressStates()
         ]);
 
         setResumeState(resume);
@@ -92,7 +99,8 @@ export default function CodeEntryScreen() {
           status: "ready",
           manifests,
           audio,
-          message
+          message,
+          progressByTourCode: createProgressMap(progressStates)
         });
       } catch (error) {
         setResumeState(null);
@@ -121,7 +129,8 @@ export default function CodeEntryScreen() {
       const [manifestCount, audio] = await Promise.all([
         clearCachedPublishedTourManifests(),
         clearAudioCache(),
-        clearVisitorResumeState()
+        clearVisitorResumeState(),
+        clearTourProgressStates()
       ]);
 
       await refreshCacheState(
@@ -175,6 +184,11 @@ export default function CodeEntryScreen() {
           <ResumePanel
             onOpenRoute={() => openTourByCode(resumeState.tourCode)}
             onOpenStop={openResumeStop}
+            progress={
+              cacheState.status === "ready"
+                ? cacheState.progressByTourCode[resumeState.tourCode]
+                : undefined
+            }
             resume={resumeState}
           />
         ) : null}
@@ -252,40 +266,51 @@ function OfflineCachePanel({
 
           {state.manifests.length > 0 ? (
             <View style={styles.cachedTourList}>
-              {state.manifests.slice(0, 3).map((manifest) => (
-                <Pressable
-                  accessibilityLabel={`Open ${manifest.title}`}
-                  accessibilityRole="button"
-                  key={manifest.tourCode}
-                  onPress={() => onOpenTour(manifest.tourCode)}
-                  style={({ pressed }) => [
-                    styles.cachedTourRow,
-                    pressed ? styles.cachedTourRowPressed : null
-                  ]}
-                >
-                  <View style={styles.cachedTourText}>
-                    <Text style={styles.cachedTourTitle}>{manifest.title}</Text>
-                    <Text style={styles.cachedTourMeta}>
-                      {manifest.city} - {manifest.stopCount} stops
-                    </Text>
-                    <Text style={styles.cachedTourDetail}>
-                      {`Saved ${formatDisplayTimestamp(
-                        manifest.cachedAt
-                      )} - Published ${formatDisplayTimestamp(
-                        manifest.publishedAt
-                      )} - Hash ${formatShortContentHash(
-                        manifest.contentHash
-                      )}`}
-                    </Text>
-                  </View>
-                  <View style={styles.cachedTourAction}>
-                    <Text style={styles.cachedTourCode}>
-                      {manifest.tourCode}
-                    </Text>
-                    <Text style={styles.cachedTourOpen}>Open</Text>
-                  </View>
-                </Pressable>
-              ))}
+              {state.manifests.slice(0, 3).map((manifest) => {
+                const progress =
+                  state.progressByTourCode[manifest.tourCode] ??
+                  state.progressByTourCode[manifest.tourCode.toUpperCase()];
+
+                return (
+                  <Pressable
+                    accessibilityLabel={`Open ${manifest.title}`}
+                    accessibilityRole="button"
+                    key={manifest.tourCode}
+                    onPress={() => onOpenTour(manifest.tourCode)}
+                    style={({ pressed }) => [
+                      styles.cachedTourRow,
+                      pressed ? styles.cachedTourRowPressed : null
+                    ]}
+                  >
+                    <View style={styles.cachedTourText}>
+                      <Text style={styles.cachedTourTitle}>
+                        {manifest.title}
+                      </Text>
+                      <Text style={styles.cachedTourMeta}>
+                        {manifest.city} - {manifest.stopCount} stops
+                      </Text>
+                      <Text style={styles.cachedTourProgress}>
+                        {formatCompactProgress(progress, manifest.stopCount)}
+                      </Text>
+                      <Text style={styles.cachedTourDetail}>
+                        {`Saved ${formatDisplayTimestamp(
+                          manifest.cachedAt
+                        )} - Published ${formatDisplayTimestamp(
+                          manifest.publishedAt
+                        )} - Hash ${formatShortContentHash(
+                          manifest.contentHash
+                        )}`}
+                      </Text>
+                    </View>
+                    <View style={styles.cachedTourAction}>
+                      <Text style={styles.cachedTourCode}>
+                        {manifest.tourCode}
+                      </Text>
+                      <Text style={styles.cachedTourOpen}>Open</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
           ) : (
             <Text style={styles.cacheBody}>
@@ -318,10 +343,12 @@ function OfflineCachePanel({
 function ResumePanel({
   onOpenRoute,
   onOpenStop,
+  progress,
   resume
 }: {
   onOpenRoute: () => void;
   onOpenStop: () => void;
+  progress: TourProgressState | undefined;
   resume: VisitorResumeState;
 }) {
   const hasStop = Boolean(resume.lastStop);
@@ -337,6 +364,13 @@ function ResumePanel({
         <Text style={styles.resumeBody}>
           {resumeText} - last opened {formatDisplayTimestamp(resume.updatedAt)}
         </Text>
+        {progress ? (
+          <Text style={styles.resumeProgress}>
+            {progress.completedAt
+              ? "Tour complete"
+              : formatCompactProgress(progress, 0)}
+          </Text>
+        ) : null}
         <Text style={styles.resumeMeta}>
           {resume.city} - {resume.tourCode}
         </Text>
@@ -367,6 +401,31 @@ function CacheStat({ label, value }: { label: string; value: string }) {
       <Text style={styles.cacheStatValue}>{value}</Text>
     </View>
   );
+}
+
+function createProgressMap(
+  progressStates: TourProgressState[]
+): Record<string, TourProgressState> {
+  return Object.fromEntries(
+    progressStates.map((progress) => [progress.tourCode, progress])
+  );
+}
+
+function formatCompactProgress(
+  progress: TourProgressState | undefined,
+  stopCount: number
+): string {
+  if (!progress || progress.playedStopIds.length === 0) {
+    return stopCount > 0 ? `0/${stopCount} played` : "No stops played";
+  }
+
+  if (progress.completedAt) {
+    return "Complete";
+  }
+
+  return stopCount > 0
+    ? `${progress.playedStopIds.length}/${stopCount} played`
+    : `${progress.playedStopIds.length} played`;
 }
 
 function formatBytes(bytes: number): string {
@@ -476,6 +535,11 @@ const styles = StyleSheet.create({
     color: "#53615a",
     fontSize: 14,
     lineHeight: 20
+  },
+  resumeProgress: {
+    color: "#2d6a4f",
+    fontSize: 13,
+    fontWeight: "800"
   },
   resumeMeta: {
     color: "#6d766f",
@@ -599,6 +663,11 @@ const styles = StyleSheet.create({
   cachedTourMeta: {
     color: "#53615a",
     fontSize: 12
+  },
+  cachedTourProgress: {
+    color: "#2d6a4f",
+    fontSize: 12,
+    fontWeight: "800"
   },
   cachedTourDetail: {
     color: "#6d766f",

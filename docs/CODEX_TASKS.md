@@ -14,7 +14,7 @@ Use this list to keep early work sequenced.
 
 ## Mobile
 
-- Add played-stop progress markers and local tour completion state.
+- Add per-tour progress reset controls for visitors.
 
 ## Completed Foundation Slices
 
@@ -41,6 +41,7 @@ Use this list to keep early work sequenced.
 - Added automated mobile web smoke coverage for tour lookup, invalid codes, stop detail, and cache clearing.
 - Added mobile offline UX polish, cached manifest metadata, and retry controls.
 - Added mobile tour resume, cached-tour reopening, and stop deep-link fallback polish.
+- Added played-stop progress markers and local tour completion state.
 
 ## Backend
 
